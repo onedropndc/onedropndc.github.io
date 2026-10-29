@@ -8,7 +8,6 @@
   <meta name="author" content="Foysal Mahmud — Notre Dame College Batch 27">
   <meta name="theme-color" content="#C8102E">
   <meta name="color-scheme" content="light">
-  <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://onedropndc.github.io/admin.html">
 
   <meta property="og:type" content="website">
@@ -30,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.7.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
 
   <meta name="robots" content="noindex, nofollow">
 </head>
@@ -93,21 +92,27 @@
             <span class="muted small">Signed in as <strong id="adminEmailOut"></strong> · <span id="adminRoleOut" class="muted small"></span></span>
             <button class="btn btn-ghost btn-xs" id="adminSignOut" type="button">Sign out</button>
           </div>
-          <div class="admin-tabs" role="tablist">
-            <button data-tab="overview" class="is-active" role="tab">Overview</button>
-            <button data-tab="donors" role="tab">Donors</button>
-            <button data-tab="requests" role="tab">Requests</button>
-            <button data-tab="announcements" role="tab">Announcements</button>
-            <button data-tab="messages" role="tab">Messages</button>
+          <div class="admin-tabs" role="tablist" aria-label="Dashboard sections">
+            <button data-tab="overview" id="tab-overview" class="is-active" role="tab" aria-selected="true" aria-controls="panel-overview">Overview</button>
+            <button data-tab="donors" id="tab-donors" role="tab" aria-selected="false" aria-controls="panel-donors" tabindex="-1">Donors</button>
+            <button data-tab="requests" id="tab-requests" role="tab" aria-selected="false" aria-controls="panel-requests" tabindex="-1">Requests</button>
+            <button data-tab="announcements" id="tab-announcements" role="tab" aria-selected="false" aria-controls="panel-announcements" tabindex="-1">Announcements</button>
+            <button data-tab="messages" id="tab-messages" role="tab" aria-selected="false" aria-controls="panel-messages" tabindex="-1">Messages</button>
           </div>
 
-          <div data-panel="overview" id="overviewHost"></div>
+          <div data-panel="overview" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+            <div id="overviewHost"></div>
+          </div>
 
-          <div data-panel="donors" id="adminDonors" hidden></div>
+          <div data-panel="donors" id="panel-donors" role="tabpanel" aria-labelledby="tab-donors" hidden>
+            <div id="adminDonors"></div>
+          </div>
 
-          <div data-panel="requests" id="adminRequests" hidden></div>
+          <div data-panel="requests" id="panel-requests" role="tabpanel" aria-labelledby="tab-requests" hidden>
+            <div id="adminRequests"></div>
+          </div>
 
-          <div data-panel="announcements" hidden>
+          <div data-panel="announcements" id="panel-announcements" role="tabpanel" aria-labelledby="tab-announcements" hidden>
             <div class="form-card" style="max-width:640px">
               <h3 style="margin-bottom:.8rem">Publish an announcement</h3>
               <p class="muted small" style="margin-bottom:1rem">Shown at the top of the home page for every visitor until you hide it.</p>
@@ -133,7 +138,9 @@
             <div id="announceList" style="margin-top:1.4rem"></div>
           </div>
 
-          <div data-panel="messages" id="adminMessages" hidden></div>
+          <div data-panel="messages" id="panel-messages" role="tabpanel" aria-labelledby="tab-messages" hidden>
+            <div id="adminMessages"></div>
+          </div>
         </div>
       </div>
     </section>

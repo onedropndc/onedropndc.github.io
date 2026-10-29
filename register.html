@@ -30,7 +30,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.7.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
 
 </head>
 <body>
@@ -143,21 +143,26 @@
           <div class="success-panel" id="successPanel" hidden></div>
         </div>
 
-        <aside class="panel" aria-label="Before you register">
-          <h3 style="margin-bottom:.6rem">Before you register</h3>
-          <ul class="muted small" style="padding-left:1.1rem;display:grid;gap:.5rem">
-            <li>You must weigh at least 50 kg and be 18–65 years old.</li>
-            <li>Wait 56 days between whole-blood donations.</li>
-            <li>Skip donation if you have a fever, are on antibiotics, or donated blood in the last 8 weeks.</li>
-            <li>Eat normally and drink plenty of water beforehand.</li>
-            <li>Bring your national ID or birth certificate to the blood bank.</li>
-          </ul>
-          <div class="callout ok" style="margin-top:1rem">
-            <p class="small"><strong>Why it matters:</strong> Bangladesh needs roughly 2.4 million units of blood a year, and voluntary donors cover only a part of that.</p>
-          </div>
-          <div style="margin-top:1rem" id="badgePreview" aria-live="polite"></div>
-          <p class="muted small">Your badge preview appears here once you pick a blood group.</p>
-        </aside>
+        <div class="form-side">
+          <aside class="panel" aria-label="Before you register">
+            <h3 style="margin-bottom:.6rem">Before you register</h3>
+            <ul class="muted small" style="padding-left:1.1rem;display:grid;gap:.5rem">
+              <li>You must weigh at least 50 kg and be 18–65 years old.</li>
+              <li>Wait 56 days between whole-blood donations.</li>
+              <li>Skip donation if you have a fever, are on antibiotics, or donated blood in the last 8 weeks.</li>
+              <li>Eat normally and drink plenty of water beforehand.</li>
+              <li>Bring your national ID or birth certificate to the blood bank.</li>
+            </ul>
+            <div class="callout ok" style="margin-top:1rem">
+              <p class="small"><strong>Why it matters:</strong> Bangladesh needs roughly 2.4 million units of blood a year, and voluntary donors cover only a part of that.</p>
+            </div>
+            <div style="margin-top:1rem" id="badgePreview" aria-live="polite"></div>
+            <p class="muted small">Your badge preview appears here once you pick a blood group.</p>
+          </aside>
+
+          <!-- WhatsApp community — rendered by assets/js/ui.js (mountCommunity) -->
+          <div data-community="sidebar"></div>
+        </div>
       </div>
     </section>
   </main>

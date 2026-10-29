@@ -29,7 +29,18 @@ export const OWNER_EMAILS = ['foysal.cyber@gmail.com'];
    canonical tags, Open Graph cards and the sitemap point correctly. */
 export const SITE_URL  = 'https://onedropndc.github.io';
 export const SITE_NAME = 'One Drop — A Drop of Life';
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.9.0';
+
+/* Official WhatsApp community.
+   Change the invite link in ONE place only. The home-page band, the register
+   sidebar, the "profile published" success screen, My Donor, the footer and
+   the FAQ all read it from here. When the invite link is reset in WhatsApp,
+   update `url` below and the static links in index.html / faq.html / about.html. */
+export const WHATSAPP = {
+  url: 'https://chat.whatsapp.com/EbbmwOw6kdCKToOjH6uznl',
+  name: 'One Drop Community',
+  tagline: 'Emergency requests, donation camps and donor advice — on the phone you already carry.'
+};
 
 /* Optional: Web push (Firebase Cloud Messaging).
    1. Firebase console → Project settings → Cloud Messaging → Web Push certificates → Generate key pair

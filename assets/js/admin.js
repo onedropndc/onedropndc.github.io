@@ -3,13 +3,18 @@
 import { APP, VAPID_KEY, FIREBASE_CONFIG, OWNER_EMAILS } from './config.js';
 import { initData, listDonors, listRequests, listMessages, markMessageRead, listAnnouncements,
          saveAnnouncement, deleteAnnouncement, updateDonor, deleteDonor, updateRequest, deleteRequest,
-         clearLocalData, seedDemo, getStatSnapshot, isLive } from './data.js';
+         clearLocalData, seedDemo, getStatSnapshot, isLive, logAudit } from './data.js';
 import { bootUI, icon, toast, dialog, copyText, escapeHtml as _e, bloodBadge, avatar } from './ui.js';
-import { formatDate, formatDateTime, timeAgo, prettyPhone } from './blood.js';
+import { formatDate, formatDateTime, timeAgo, prettyPhone, BLOOD_GROUPS } from './blood.js';
 import { computeStats } from './stats.js';
+import { donorsToCsv, requestsToCsv, downloadCsv, isDemoRow } from './csv.js';
 import { state as fb, waitForAuth } from './firebase.js';
 
-let ctx = { donors: [], requests: [], messages: [], announcements: [] };
+let ctx = { donors: [], requests: [], messages: [], announcements: [], role: 'moderator' };
+
+/* Donor-tab view state (filters live here so a refresh or a status change
+   never resets what the moderator is looking at). */
+const donorView = { q: '', group: 'ALL', status: 'ALL', availableOnly: false };
 
 const providerOf = (u) =>
   (u && u.providerData && u.providerData[0] && u.providerData[0].providerId) ||
@@ -26,7 +31,7 @@ function friendlyAuthError(err) {
 }
 
 export async function initAdmin() {
-  bootUI('about');
+  bootUI('admin');
   await initData();
 
   const gate = document.getElementById('adminGate');
@@ -47,13 +52,19 @@ export async function initAdmin() {
       so.dataset.wired = '1';
       so.addEventListener('click', async () => {
         try { await fb.fa.signOut(fb.auth); } catch {}
+        // Leave no donor phone numbers behind on a shared device.
+        ctx = { donors: [], requests: [], messages: [], announcements: [], role: 'moderator' };
+        ['overviewHost', 'adminDonors', 'adminRequests', 'adminMessages', 'announceList'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) { el.innerHTML = ''; el.removeAttribute('data-ready'); }
+        });
         panel.hidden = true;
         form.reset();
         gate.hidden = false;
         note.textContent = 'Signed out.';
       });
     }
-    loadAll().then(() => wireTabs());
+    loadAll().then(() => { renderOverview(); wireTabs(); });
   }
 
   // Firebase restores sessions asynchronously — wait for it, then require a
@@ -83,20 +94,26 @@ export async function initAdmin() {
     }
   });
   wireAnnouncements();
-  renderOverview();
 }
 
 async function loadAll() {
   const [donors, requests, messages, announcements] = await Promise.all([
-    listDonors(), listRequests(), listMessages(), listAnnouncements()
+    listDonors(), listRequests(), listMessages(), listAnnouncements({ includeInactive: true })
   ]);
   ctx = { donors, requests, messages, announcements, role: ctx.role };
 }
 
 function wireTabs() {
   const tabs = document.querySelectorAll('[data-tab]');
+  if (!tabs.length || tabs[0].dataset.wired === '1') return;
+  tabs.forEach((t) => { t.dataset.wired = '1'; });
   tabs.forEach((t) => t.addEventListener('click', () => {
-    tabs.forEach((x) => x.classList.toggle('is-active', x === t));
+    tabs.forEach((x) => {
+      const on = x === t;
+      x.classList.toggle('is-active', on);
+      x.setAttribute('aria-selected', String(on));
+      x.tabIndex = on ? 0 : -1;
+    });
     document.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== t.dataset.tab; });
     if (t.dataset.tab === 'donors') renderDonors();
     if (t.dataset.tab === 'requests') renderRequests();
@@ -116,10 +133,10 @@ async function renderOverview() {
 
   document.getElementById('overviewHost').innerHTML = `
     <div class="stat-grid stat-grid-sm">
-      ${miniStat('Donors', s.total, `${s.active} available`)}
-      ${miniStat('Pending review', pending, pending ? 'needs attention' : 'all clear')}
-      ${miniStat('Active requests', activeReqs, `${ctx.requests.length} total`)}
-      ${miniStat('Unread messages', unread, unread ? 'open the inbox tab' : 'all read')}
+      ${miniStat('Donors', s.total, `${s.active} available`, 'donors')}
+      ${miniStat('Pending review', pending, pending ? 'needs attention' : 'all clear', 'donors-pending')}
+      ${miniStat('Active requests', activeReqs, `${ctx.requests.length} total`, 'requests')}
+      ${miniStat('Unread messages', unread, unread ? 'open the inbox tab' : 'all read', 'messages')}
       ${miniStat('Visits', stats ? stats.visits : '—', 'all time')}
       ${miniStat('Registrations', stats ? stats.donations_registered : '—', 'all time')}
       ${miniStat('Requests posted', stats ? stats.requests_posted : '—', 'all time')}
@@ -129,13 +146,15 @@ async function renderOverview() {
     <div class="admin-tools">
       <h3>Tools</h3>
       <div class="tool-row">
+        <button class="btn btn-primary btn-sm" id="btnExportDonorsTop">${icon('download')} Export donors (CSV)</button>
+        <button class="btn btn-ghost btn-sm" id="btnExportRequestsTop">${icon('download')} Export requests (CSV)</button>
         <button class="btn btn-ghost btn-sm" id="btnRefresh">${icon('clock')} Refresh data</button>
         <button class="btn btn-ghost btn-sm" id="btnCopyRules">${icon('shield')} Copy Firestore rules</button>
         <button class="btn btn-ghost btn-sm" id="btnSeed">${icon('plus')} Load demo dataset</button>
         <button class="btn btn-ghost btn-sm danger" id="btnClearLocal">${icon('trash')} Clear local cache</button>
         ${VAPID_KEY ? '<button class="btn btn-ghost btn-sm" id="btnPush">' + icon('bell') + ' Subscribe to push</button>' : ''}
       </div>
-      <p class="muted small">Firestore rules protect the database from anonymous writes to fields you do not want public to edit. Paste them into Firebase console → Firestore → Rules.</p>
+      <p class="muted small">CSV exports contain every donor field, phone numbers included — download them only on a trusted device. Firestore rules protect the database from anonymous writes to fields you do not want public to edit.</p>
       <div class="admin-note">
         <strong>Moderation checklist:</strong> verify a donor only after you have confirmed the number by a call or a photo of the donor's ID. Suspend rather than delete when a listing is simply wrong — it keeps the record for auditing.
       </div>
@@ -145,6 +164,8 @@ async function renderOverview() {
     document.getElementById('btnSeed').style.display = 'none';
     document.getElementById('btnClearLocal').style.display = 'none';
   }
+  document.getElementById('btnExportDonorsTop').onclick = () => openExportDialog('donors');
+  document.getElementById('btnExportRequestsTop').onclick = () => openExportDialog('requests');
   document.getElementById('btnRefresh').onclick = async () => { await loadAll(); renderOverview(); toast('Data refreshed.', 'success'); };
   document.getElementById('btnCopyRules').onclick = async () => {
     const ok = await copyText(FIRESTORE_RULES);
@@ -158,25 +179,157 @@ async function renderOverview() {
     const ok = await dialog({ title: 'Clear local cache?', body: '<p>Removes cached donors, requests and the demo flag from this browser. Cloud data is untouched.</p>', confirmText: 'Clear', variant: 'danger' });
     if (ok) { clearLocalData(); await loadAll(); renderOverview(); toast('Local cache cleared.', 'success'); }
   };
-  document.getElementById('btnPush')?.addEventListener('click', async () => subscribePush());
+  document.querySelectorAll('#overviewHost [data-jump]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const jump = el.dataset.jump;
+      const tab = jump === 'donors-pending' ? 'donors' : jump;
+      if (jump === 'donors-pending') { donorView.status = 'pending'; const sel = document.getElementById('donorFilterStatus'); if (sel) sel.value = 'pending'; }
+      document.querySelector(`[data-tab="${tab}"]`)?.click();
+    });
+  });
+
+  const pushBtn = document.getElementById('btnPush');
+  if (pushBtn && pushBtn.dataset.wired !== '1') { pushBtn.dataset.wired = '1'; pushBtn.addEventListener('click', () => subscribePush()); }
 }
 
-function miniStat(label, value, sub) {
-  return `<div class="stat-card stat-mini"><span class="stat-value">${_e(String(value))}</span><span class="stat-label">${_e(label)}</span><span class="stat-sub">${_e(sub)}</span></div>`;
+function miniStat(label, value, sub, jump) {
+  const tag = jump ? 'button' : 'div';
+  return `<${tag} class="stat-card stat-mini"${jump ? ` type="button" data-jump="${jump}"` : ''}>
+    <span class="stat-value">${_e(String(value))}</span>
+    <span class="stat-label">${_e(label)}</span>
+    <span class="stat-sub">${_e(sub)}</span>
+  </${tag}>`;
 }
 
 /* ------------------------------------------------------ donors */
+const byPendingThenNewest = (a, b) => {
+  const pa = a.status === 'pending' ? 0 : 1;
+  const pb = b.status === 'pending' ? 0 : 1;
+  if (pa !== pb) return pa - pb;
+  return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+};
+
+function filteredDonors() {
+  const q = donorView.q.trim().toLowerCase();
+  const digits = q.replace(/\D/g, '');
+  return ctx.donors.filter((d) => {
+    if (donorView.group !== 'ALL' && String(d.bloodGroup || '').toUpperCase() !== donorView.group) return false;
+    if (donorView.status !== 'ALL' && String(d.status || 'pending') !== donorView.status) return false;
+    if (donorView.availableOnly && d.available === false) return false;
+    if (!q) return true;
+    const hay = [d.name, d.district, d.area, d.note, d.phone, String(d.phone || '').replace(/\D/g, '')]
+      .join(' ').toLowerCase();
+    return hay.includes(q) || (digits.length >= 3 && String(d.phone || '').includes(digits));
+  }).sort(byPendingThenNewest);
+}
+
 function renderDonors() {
   const host = document.getElementById('adminDonors');
-  const rows = ctx.donors.slice().sort((a, b) => (a.status === 'pending' ? -1 : 1) - (b.status === 'pending' ? -1 : 1) || (a.createdAt < b.createdAt ? 1 : -1));
+  if (!host) return;
+
+  if (host.dataset.ready !== '1') {
+    host.innerHTML = `
+      <div class="admin-view-head">
+        <div>
+          <h2 class="admin-view-title">Donor directory</h2>
+          <p class="muted small">Verify a donor only after you have confirmed the number by a call or a photo of their ID.
+            Suspend rather than delete when a listing is simply wrong.</p>
+        </div>
+        <div class="admin-view-actions">
+          <button class="btn btn-ghost btn-sm" id="btnDonorRefresh">${icon('clock')} Refresh</button>
+          <button class="btn btn-primary btn-sm" id="btnExportDonors">${icon('download')} Export CSV</button>
+        </div>
+      </div>
+
+      <div class="filter-bar" role="search" aria-label="Filter donors">
+        <div class="search-field">
+          ${icon('search')}
+          <input id="donorFilterQ" class="input" type="search" placeholder="Name, phone, area or note…" autocomplete="off" aria-label="Search donors">
+        </div>
+        <select id="donorFilterGroup" class="input" aria-label="Filter by blood group">
+          <option value="ALL">All groups</option>
+          ${BLOOD_GROUPS.map((g) => `<option value="${g}">${g}</option>`).join('')}
+        </select>
+        <select id="donorFilterStatus" class="input" aria-label="Filter by status">
+          <option value="ALL">Any status</option>
+          <option value="pending">Pending review</option>
+          <option value="verified">Verified</option>
+          <option value="suspended">Suspended</option>
+        </select>
+        <label class="switch"><input type="checkbox" id="donorFilterAvailable"> Available only</label>
+        <span id="donorCount" class="muted small" aria-live="polite"></span>
+      </div>
+
+      <div id="donorTableHost" aria-live="polite"></div>
+
+      <p class="csv-note">${icon('shield')} The CSV export contains personal data — phone numbers included.
+        Download it only on a trusted device, share it only with the moderation team, and delete it when the day is done.</p>`;
+    wireDonorControls(host);
+    host.dataset.ready = '1';
+  }
+  renderDonorTable();
+}
+
+function wireDonorControls(host) {
+  const q = host.querySelector('#donorFilterQ');
+  q.addEventListener('input', () => { donorView.q = q.value; renderDonorTable(); });
+
+  const group = host.querySelector('#donorFilterGroup');
+  group.value = donorView.group;
+  group.addEventListener('change', () => { donorView.group = group.value; renderDonorTable(); });
+
+  const status = host.querySelector('#donorFilterStatus');
+  status.value = donorView.status;
+  status.addEventListener('change', () => { donorView.status = status.value; renderDonorTable(); });
+
+  const avail = host.querySelector('#donorFilterAvailable');
+  avail.checked = donorView.availableOnly;
+  avail.addEventListener('change', () => { donorView.availableOnly = avail.checked; renderDonorTable(); });
+
+  host.querySelector('#btnExportDonors').addEventListener('click', () => openExportDialog('donors'));
+  host.querySelector('#btnDonorRefresh').addEventListener('click', async () => {
+    await loadAll();
+    renderDonorTable();
+    toast('Donor list refreshed.', 'success');
+  });
+}
+
+function renderDonorTable() {
+  const host = document.getElementById('donorTableHost');
+  if (!host) return;
+  const rows = filteredDonors();
+  const pending = ctx.donors.filter((d) => d.status === 'pending').length;
+  const count = document.getElementById('donorCount');
+  if (count) {
+    count.textContent = `${rows.length} of ${ctx.donors.length} shown${pending ? ` · ${pending} awaiting review` : ''}`;
+  }
+
+  if (!rows.length) {
+    host.innerHTML = `<div class="empty">
+      <div class="empty-mark">${icon('search')}</div>
+      <h3>No donors match this filter</h3>
+      <p>Clear the search box or pick another blood group.</p>
+      <div class="empty-actions"><button class="btn btn-ghost btn-sm" id="btnDonorClearFilters">Clear filters</button></div>
+    </div>`;
+    host.querySelector('#btnDonorClearFilters')?.addEventListener('click', () => {
+      donorView.q = ''; donorView.group = 'ALL'; donorView.status = 'ALL'; donorView.availableOnly = false;
+      const q = document.getElementById('donorFilterQ'); if (q) q.value = '';
+      const g = document.getElementById('donorFilterGroup'); if (g) g.value = 'ALL';
+      const st = document.getElementById('donorFilterStatus'); if (st) st.value = 'ALL';
+      const av = document.getElementById('donorFilterAvailable'); if (av) av.checked = false;
+      renderDonorTable();
+    });
+    return;
+  }
+
   host.innerHTML = `<div class="table-wrap"><table class="data-table">
-    <thead><tr><th>Donor</th><th>Group</th><th>Location</th><th>Contact</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th scope="col">Donor</th><th scope="col">Group</th><th scope="col">Location</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
     <tbody>${rows.map((d) => `<tr data-row="${d.id}">
-      <td><div class="cell-user">${avatar(d.name, d.bloodGroup)}<div><strong>${_e(d.name)}</strong><span class="muted small">${timeAgo(d.createdAt)}</span></div></div></td>
+      <td><div class="cell-user">${avatar(d.name, d.bloodGroup)}<div><strong>${_e(d.name || 'Unnamed')}</strong><span class="muted small">${timeAgo(d.createdAt)}${isDemoRow(d) ? ' · sample' : ''}</span></div></div></td>
       <td>${bloodBadge(d.bloodGroup, 'sm')}</td>
       <td>${_e([d.area, d.district].filter(Boolean).join(', '))}</td>
       <td class="mono">${_e(prettyPhone(d.phone))}</td>
-      <td><span class="pill pill-${d.status}">${d.status}</span>${d.available === false ? ' <span class="pill pill-off">busy</span>' : ''}</td>
+      <td><span class="pill pill-${_e(d.status || 'pending')}">${_e(d.status || 'pending')}</span>${d.available === false ? ' <span class="pill pill-off">busy</span>' : ''}</td>
       <td class="cell-actions">
         <button class="btn btn-ghost btn-xs" data-a="verify">${d.status === 'verified' ? 'Unverify' : 'Verify'}</button>
         ${ctx.role === 'owner' ? `<button class="btn btn-ghost btn-xs" data-a="edit">Edit</button>
@@ -187,13 +340,96 @@ function renderDonors() {
 
   host.querySelectorAll('tr[data-row]').forEach((tr) => {
     const d = ctx.donors.find((x) => x.id === tr.dataset.row);
-    tr.querySelector('[data-a="verify"]')?.addEventListener('click', async () => { await updateDonor(d.id, { status: d.status === 'verified' ? 'pending' : 'verified' }); await loadAll(); renderDonors(); toast('Status updated.', 'success'); });
+    if (!d) return;
+    tr.querySelector('[data-a="verify"]')?.addEventListener('click', async () => { await updateDonor(d.id, { status: d.status === 'verified' ? 'pending' : 'verified' }); await loadAll(); renderDonorTable(); toast('Status updated.', 'success'); });
     tr.querySelector('[data-a="edit"]')?.addEventListener('click', () => openEditDonor(d));
-    tr.querySelector('[data-a="toggle"]')?.addEventListener('click', async () => { await updateDonor(d.id, { available: !(d.available !== false) }); await loadAll(); renderDonors(); toast('Availability updated.', 'success'); });
+    tr.querySelector('[data-a="toggle"]')?.addEventListener('click', async () => { await updateDonor(d.id, { available: !(d.available !== false) }); await loadAll(); renderDonorTable(); toast('Availability updated.', 'success'); });
     tr.querySelector('[data-a="delete"]')?.addEventListener('click', async () => {
       const ok = await dialog({ title: `Delete ${d.name}?`, body: '<p>This removes the donor permanently.</p>', confirmText: 'Delete', variant: 'danger' });
-      if (ok) { await deleteDonor(d.id); await loadAll(); renderDonors(); toast('Deleted.', 'success'); }
+      if (ok) { await deleteDonor(d.id); await loadAll(); renderDonorTable(); toast('Deleted.', 'success'); }
     });
+  });
+}
+
+/* ------------------------------------------------ CSV export */
+function exportRows(kind, { includeDemo, onlyFiltered }) {
+  const source = kind === 'donors' ? ctx.donors : ctx.requests;
+  let rows = onlyFiltered && kind === 'donors' ? filteredDonors() : source.slice();
+  if (!includeDemo) rows = rows.filter((r) => !isDemoRow(r));
+  return rows;
+}
+
+function openExportDialog(kind = 'donors') {
+  const isDonors = kind === 'donors';
+  const source = isDonors ? ctx.donors : ctx.requests;
+  const demoCount = source.filter(isDemoRow).length;
+  const filteredCount = isDonors ? filteredDonors().length : source.length;
+  const preview = (isDonors ? donorsToCsv([], { excludeDemo: false }) : requestsToCsv([], { excludeDemo: false })).columns;
+  const rowWord = isDonors ? 'donor' : 'request';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal';
+  wrap.innerHTML = `
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+      <h2 id="expTitle">Export ${rowWord}s to CSV</h2>
+      <div class="modal-body">
+        <p class="muted small">One spreadsheet-ready file with every field — phone numbers included.
+          Treat it as confidential: open it on a trusted device and delete it when you are done.</p>
+
+        <div class="export-facts">
+          <div><span>Rows</span><strong id="expRows">0</strong></div>
+          <div><span>Columns</span><strong>${preview.length}</strong></div>
+          <div><span>Encoding</span><strong>UTF-8 · Excel-safe</strong></div>
+        </div>
+
+        <label class="check-line">
+          <input type="checkbox" id="expIncludeDemo" ${demoCount ? '' : 'disabled'}>
+          <span>Include ${demoCount} demo/sample ${rowWord}${demoCount === 1 ? '' : 's'}
+            <em>${demoCount ? 'Fake rows used for demos — leave unticked for a clean export.' : 'There are none on this device.'}</em></span>
+        </label>
+        ${isDonors ? `<label class="check-line">
+          <input type="checkbox" id="expOnlyFiltered" ${filteredCount === source.length ? 'disabled' : ''}>
+          <span>Only the rows matching the current filter
+            <em>${filteredCount} of ${source.length} rows</em></span>
+        </label>` : ''}
+
+        <div class="export-preview">
+          <span>Columns in the file</span>
+          <code>${_e(preview.join(', '))}</code>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-close>Cancel</button>
+        <button class="btn btn-primary" data-go>${icon('download')} Download CSV</button>
+      </div>
+    </div>`;
+  document.getElementById('modalRoot').appendChild(wrap);
+
+  const close = () => wrap.remove();
+  const demoBox = wrap.querySelector('#expIncludeDemo');
+  const filterBox = wrap.querySelector('#expOnlyFiltered');
+  const rowsOut = wrap.querySelector('#expRows');
+
+  const options = () => ({
+    includeDemo: !!(demoBox && demoBox.checked && !demoBox.disabled),
+    onlyFiltered: !!(filterBox && filterBox.checked && !filterBox.disabled)
+  });
+  const refresh = () => { rowsOut.textContent = String(exportRows(kind, options()).length); };
+  demoBox?.addEventListener('change', refresh);
+  filterBox?.addEventListener('change', refresh);
+  refresh();
+
+  wrap.addEventListener('click', (e) => { if (e.target.hasAttribute('data-close')) close(); });
+  wrap.querySelector('[data-go]').addEventListener('click', async () => {
+    const opts = options();
+    const rows = exportRows(kind, opts);
+    if (!rows.length) { toast('Nothing to export with these options.', 'error'); return; }
+    const built = isDonors ? donorsToCsv(rows, { excludeDemo: false }) : requestsToCsv(rows, { excludeDemo: false });
+    downloadCsv(built.filename, built.csv);
+    close();
+    toast(`Exported ${built.count} ${rowWord}${built.count === 1 ? '' : 's'} → ${built.filename}`, 'success', 6000);
+    try { await logAudit(`export_${kind}_csv`, `${built.count} rows`); } catch { /* owner-only collection */ }
   });
 }
 
@@ -240,9 +476,20 @@ function openEditDonor(d) {
 /* ---------------------------------------------------- requests */
 function renderRequests() {
   const host = document.getElementById('adminRequests');
-  const rows = ctx.requests.slice().sort((a, b) => (a.status === 'pending' ? -1 : 1) - (b.status === 'pending' ? -1 : 1));
-  host.innerHTML = `<div class="table-wrap"><table class="data-table">
-    <thead><tr><th>Patient / hospital</th><th>Group</th><th>Units</th><th>Needed by</th><th>State</th><th>Actions</th></tr></thead>
+  const rows = ctx.requests.slice().sort(byPendingThenNewest);
+  const pending = rows.filter((r) => r.status === 'pending').length;
+  host.innerHTML = `
+    <div class="admin-view-head">
+      <div>
+        <h2 class="admin-view-title">Emergency requests</h2>
+        <p class="muted small">Approve a request to publish it on the live board${pending ? ` · <strong>${pending} waiting for review</strong>` : ''}.</p>
+      </div>
+      <div class="admin-view-actions">
+        <button class="btn btn-primary btn-sm" id="btnExportRequests">${icon('download')} Export CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="data-table">
+    <thead><tr><th scope="col">Patient / hospital</th><th scope="col">Group</th><th scope="col">Units</th><th scope="col">Needed by</th><th scope="col">State</th><th scope="col">Actions</th></tr></thead>
     <tbody>${rows.map((r) => `<tr data-row="${r.id}">
       <td><div class="cell-user"><div><strong>${_e(r.patient || 'Patient')}</strong><span class="muted small">${_e([r.hospital, r.district].filter(Boolean).join(' · '))}</span></div></div></td>
       <td>${bloodBadge(r.bloodGroup, 'sm')}</td>
@@ -259,6 +506,8 @@ function renderRequests() {
         ${ctx.role === 'owner' ? '<button class="btn btn-ghost btn-xs danger" data-a="delete">Delete</button>' : ''}
       </td>
     </tr>`).join('')}</tbody></table></div>`;
+
+  host.querySelector('#btnExportRequests').addEventListener('click', () => openExportDialog('requests'));
 
   host.querySelectorAll('tr[data-row]').forEach((tr) => {
     const r = ctx.requests.find((x) => x.id === tr.dataset.row);
@@ -295,11 +544,12 @@ function renderMessages() {
 /* ------------------------------------------------ announcements */
 function renderAnnouncements() {
   const list = document.getElementById('announceList');
-  list.innerHTML = ctx.announcements.length
-    ? ctx.announcements.map((a) => `<div class="ann-row" data-ann="${a.id}">
-        <span class="pill pill-${a.level === 'alert' ? 'cancelled' : 'pending'}">${_e(a.level)}</span>
+  const rows = ctx.announcements.slice().sort((a, b) => Number(b.active !== false) - Number(a.active !== false));
+  list.innerHTML = rows.length
+    ? rows.map((a) => `<div class="ann-row" data-ann="${a.id}">
+        <span class="pill pill-${a.active === false ? 'off' : a.level === 'alert' ? 'cancelled' : 'pending'}">${_e(a.active === false ? 'hidden' : a.level)}</span>
         <div><strong>${_e(a.title)}</strong><span class="muted small">${_e(a.body)}</span></div>
-        <button class="btn btn-ghost btn-xs" data-a="toggle">${a.active ? 'Hide' : 'Show'}</button>
+        <button class="btn btn-ghost btn-xs" data-a="toggle">${a.active === false ? 'Show' : 'Hide'}</button>
         ${ctx.role === 'owner' ? '<button class="btn btn-ghost btn-xs danger" data-a="delete">Delete</button>' : ''}
       </div>`).join('')
     : '<p class="muted">No announcements yet.</p>';

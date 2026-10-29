@@ -3,7 +3,7 @@
    PWA install, scroll reveal, animated counters.
    ============================================================= */
 
-import { APP, APP_VERSION, LS } from './config.js';
+import { APP, APP_VERSION, LS, WHATSAPP } from './config.js';
 import { initials, prettyPhone } from './blood.js';
 
 /* ------------------------------------------------------ icons */
@@ -29,11 +29,102 @@ const ICONS = {
   clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.4V12l3.2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   wifi: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5a14 14 0 0 1 18 0M6.5 13a9 9 0 0 1 11 0M10 16.4a4 4 0 0 1 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="19.4" r="1.2" fill="currentColor"/></svg>',
-  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4.6 2.3 4.8 5.2.7-3.8 3.6.9 5.2L12 16.4l-4.6 2.5.9-5.2L4.5 10l5.2-.7L12 4.6Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4.6 2.3 4.8 5.2.7-3.8 3.6.9 5.2L12 16.4l-4.6 2.5.9-5.2L4.5 10l5.2-.7L12 4.6Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  whatsapp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.18-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.91-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.28.3-1.04 1.02-1.04 2.48 0 1.46 1.06 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.42-.07-.12-.27-.2-.57-.34M12.05 21.79h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.22-3.74.99 1-3.65-.24-.38a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88 2.64 0 5.12 1.03 6.99 2.9a9.83 9.83 0 0 1 2.89 6.99c0 5.45-4.44 9.89-9.88 9.89m8.41-18.3A11.82 11.82 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.68 1.45h.01c6.55 0 11.89-5.34 11.89-11.9 0-3.18-1.24-6.17-3.48-8.41"/></svg>'
 };
 
 export function icon(name, cls = '') {
   return `<span class="ico ${cls}" aria-hidden="true">${ICONS[name] || ''}</span>`;
+}
+
+/* ------------------------------------------- WhatsApp community */
+/* Every invite surface on the site is built from these presets, so the
+   wording stays consistent and the link lives in config.js only. */
+const COMMUNITY_PRESETS = {
+  default: {
+    title: 'Join the One Drop WhatsApp community',
+    text: `${WHATSAPP.tagline} Verified requests only — leave any time.`,
+    cta: 'Join the community',
+    note: 'Verified requests · No spam · Leave any time'
+  },
+  sidebar: {
+    title: 'Join the One Drop community',
+    text: 'Emergency requests, camp announcements and donor tips reach your phone first.',
+    cta: 'Join on WhatsApp',
+    note: 'Free · No spam · Leave any time'
+  },
+  success: {
+    title: 'One last step — join the community',
+    text: 'Your profile is live. Join the WhatsApp community so an urgent request reaches you even when this tab is closed.',
+    cta: 'Join the community',
+    note: 'Your number is never shown on this website'
+  },
+  donor: {
+    title: 'Stay in the loop',
+    text: 'Verified requests, donation camps and quiet thank-yous from other donors — in one place.',
+    cta: 'Open the community',
+    note: 'Leave the community any time'
+  },
+  emergency: {
+    title: 'Need more eyes on this request?',
+    text: 'Paste the request link in the One Drop community — every member sees it the moment you press send.',
+    cta: 'Open the community',
+    note: 'Most matches start with a forwarded message'
+  }
+};
+
+export function communityCard(opts = {}) {
+  const preset = typeof opts === 'string' ? (COMMUNITY_PRESETS[opts] || COMMUNITY_PRESETS.default) : opts;
+  const {
+    title = COMMUNITY_PRESETS.default.title,
+    text = COMMUNITY_PRESETS.default.text,
+    cta = COMMUNITY_PRESETS.default.cta,
+    note = COMMUNITY_PRESETS.default.note,
+    variant = ''
+  } = preset;
+  return `<aside class="wa-card${variant ? ` wa-${variant}` : ''}" aria-label="One Drop WhatsApp community">
+    <div class="wa-head">
+      <span class="wa-logo" aria-hidden="true">${ICONS.whatsapp}</span>
+      <div class="wa-head-text">
+        <strong>${escapeHtml(title)}</strong>
+        <span title="${escapeHtml(WHATSAPP.name)}">WhatsApp community</span>
+      </div>
+    </div>
+    <p class="wa-text">${escapeHtml(text)}</p>
+    <div class="wa-actions">
+      <a class="btn btn-wa" href="${WHATSAPP.url}" target="_blank" rel="noopener noreferrer" data-wa-join>
+        ${icon('whatsapp')}<span>${escapeHtml(cta)}</span>
+      </a>
+      <button class="btn btn-ghost btn-sm" type="button" data-wa-copy>${icon('share')} Copy invite link</button>
+    </div>
+    <p class="wa-note">${escapeHtml(note)}</p>
+  </aside>`;
+}
+
+/* Render a card into any container, and wire the "copy link" button. */
+export function mountCommunity(el, preset = 'default') {
+  if (!el) return null;
+  el.innerHTML = communityCard(preset);
+  wireCommunity(el);
+  return el.firstElementChild;
+}
+
+/* Wire any [data-wa-copy] button that exists anywhere in the page. */
+export function wireCommunity(root = document) {
+  root.querySelectorAll('[data-wa-copy]').forEach((btn) => {
+    if (btn.dataset.waWired === '1') return;
+    btn.dataset.waWired = '1';
+    btn.addEventListener('click', async () => {
+      const ok = await copyText(WHATSAPP.url);
+      toast(ok ? 'Community invite link copied — paste it anywhere.' : 'Copy failed — long-press the link instead.', ok ? 'success' : 'error');
+    });
+  });
+}
+
+/* Auto-mount every <div data-community="success|sidebar|…"> in the page. */
+function mountCommunityPlaceholders(root = document) {
+  root.querySelectorAll('[data-community]').forEach((el) => mountCommunity(el, el.dataset.community || 'default'));
+  wireCommunity(root);
 }
 
 /* ------------------------------------------------- app shell */
@@ -80,6 +171,7 @@ export function mountShell(active = 'home') {
     <nav class="nav mobile" id="mobileNav" hidden aria-label="Mobile navigation">${navLinks}
       <div class="mob-extra">
         <a href="my-donor.html" class="navlink ${active === 'mydonor' ? 'is-active' : ''}">${icon('user')}<span>My donor profile</span></a>
+        <a href="${WHATSAPP.url}" class="navlink navlink-wa" target="_blank" rel="noopener noreferrer">${icon('whatsapp')}<span>Join our WhatsApp community</span></a>
         <a href="privacy.html#contact" class="navlink">${icon('chat')}<span>Contact the team</span></a>
       </div>
     </nav>
@@ -99,6 +191,14 @@ export function mountShell(active = 'home') {
           <a class="btn btn-light btn-sm" href="register.html">${icon('plus')} Become a donor</a>
           <button class="btn btn-ghost-light btn-sm" id="btnInstallFooter">${icon('download')} Install app</button>
         </div>
+        <a class="footer-wa" href="${WHATSAPP.url}" target="_blank" rel="noopener noreferrer">
+          <span class="footer-wa-ico" aria-hidden="true">${ICONS.whatsapp}</span>
+          <span class="footer-wa-text">
+            <strong>WhatsApp community</strong>
+            <em>Verified requests, straight to your phone</em>
+          </span>
+          <span class="footer-wa-go" aria-hidden="true">↗</span>
+        </a>
       </div>
       <div class="footer-col">
         <h3>Explore</h3>
@@ -240,7 +340,10 @@ export function shareUrl(url, text) {
   dialog({ title: 'Share this', body: `<div class="share-list">${rows}</div><p class="muted small">${escapeHtml(abs)}</p>`, confirmText: 'Done', hideCancel: true })
     .then(() => {});
   setTimeout(() => {
-    document.querySelectorAll('[data-share]').forEach((btn) => {
+    // Scope to the sheet that was just opened — a second sheet must not
+    // re-wire the buttons of the first one.
+    const sheet = document.querySelector('#modalRoot .modal:last-of-type') || document;
+    sheet.querySelectorAll('[data-share]').forEach((btn) => {
       btn.addEventListener('click', () => doShare(btn.dataset.share, abs, text));
     });
   }, 30);
@@ -249,7 +352,8 @@ export function shareUrl(url, text) {
 async function doShare(kind, url, text) {
   const t = text || document.title;
   if (kind === 'native' && navigator.share) {
-    try { await navigator.share({ title: t, text: t, url }); return; } catch { if (event && event.name === 'AbortError') return; }
+    // `event` used to be referenced here and is undefined in Firefox.
+    try { await navigator.share({ title: t, text: t, url }); return; } catch (err) { if (err && err.name === 'AbortError') return; }
   }
   if (kind === 'whatsapp') { window.open(`https://wa.me/?text=${encodeURIComponent(`${t}\n${url}`)}`, '_blank', 'noopener'); return; }
   if (kind === 'facebook') { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener'); return; }
@@ -445,6 +549,7 @@ export function modePill(mode, count) {
 /* ------------------------------------------------ boot combo */
 export function bootUI(active) {
   mountShell(active);
+  mountCommunityPlaceholders();
   initReveal();
   initPWA();
   initNotifyButton();

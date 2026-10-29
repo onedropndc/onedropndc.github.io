@@ -124,7 +124,7 @@ export function initAlerts() {
 
     // Update the count badge on the header bell, if the user is not on the emergency page.
     const dot = document.querySelector('#btnNotify .dot');
-    if (dot && !document.documentElement.hasAttribute('data-page-emergency')) {
+    if (dot && document.documentElement.getAttribute('data-page') !== 'emergency') {
       dot.hidden = localStorage.getItem(LS.NOTIFY) !== '1';
     }
 

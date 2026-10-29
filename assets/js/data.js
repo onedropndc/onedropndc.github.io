@@ -290,25 +290,34 @@ export async function deleteRequest(id) {
 /* ===========================================================
    ANNOUNCEMENTS / MESSAGES / STATS
    =========================================================== */
-export async function listAnnouncements() {
+/* `includeInactive` is for the moderator dashboard only: without it a hidden
+   announcement disappears from the panel and can never be shown again.
+   The public cache always keeps active rows, so visitors never see a hidden
+   notice even when the app is running from localStorage. */
+export async function listAnnouncements({ includeInactive = false } = {}) {
   await initData();
   try {
     const out = await tx('listAnnouncements', async () => {
-      const snap = await fb.fs.getDocs(fb.fs.query(fb.fs.collection(fb.db, COL.ANNOUNCE), fb.fs.where('active', '==', true)));
+      const ref = fb.fs.collection(fb.db, COL.ANNOUNCE);
+      const q = includeInactive ? ref : fb.fs.query(ref, fb.fs.where('active', '==', true));
+      const snap = await fb.fs.getDocs(q);
       return snap.docs.map(docToObj);
     });
-    writeLS(LS.ANNOUNCE, out);
-    return out;
-  } catch { return readLS(LS.ANNOUNCE, []); }
+    writeLS(LS.ANNOUNCE, out.filter((a) => a.active !== false));
+    return includeInactive ? out : out.filter((a) => a.active !== false);
+  } catch {
+    const local = readLS(LS.ANNOUNCE, []);
+    return includeInactive ? local : local.filter((a) => a.active !== false);
+  }
 }
 
 export function subscribeAnnouncements(cb) {
   initData().then(() => {
-    if (!fb.ok) { cb(readLS(LS.ANNOUNCE, [])); return; }
+    if (!fb.ok) { cb(readLS(LS.ANNOUNCE, []).filter((a) => a.active !== false)); return; }
     fb.fs.onSnapshot(fb.fs.collection(fb.db, COL.ANNOUNCE), (snap) => {
       const rows = snap.docs.map(docToObj).filter((r) => r.active);
       writeLS(LS.ANNOUNCE, rows); cb(rows);
-    }, () => cb(readLS(LS.ANNOUNCE, [])));
+    }, () => cb(readLS(LS.ANNOUNCE, []).filter((a) => a.active !== false)));
   });
 }
 

@@ -164,7 +164,8 @@ export function shareRequest(r) {
     confirmText: 'Done', hideCancel: true
   });
   setTimeout(() => {
-    document.querySelectorAll('.modal [data-share]').forEach((btn) => {
+    const sheet = document.querySelector('#modalRoot .modal:last-of-type') || document;
+    sheet.querySelectorAll('[data-share]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const kind = btn.dataset.share;
         if (kind === 'poster') { makePoster(r); return; }

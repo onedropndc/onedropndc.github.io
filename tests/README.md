@@ -25,9 +25,10 @@ sudo apt-get install -y libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
 ## Run
 
 ```bash
-npm test            # both suites
-npm run test:smoke  # tests/e2e.js       — 51 checks
-npm run test:admin  # tests/admin.e2e.js — 19 checks
+npm test             # all three suites
+npm run test:smoke   # tests/e2e.js        — 61 checks
+npm run test:admin   # tests/admin.e2e.js  — 32 checks
+npm run test:export  # tests/export.e2e.js — 40 checks (CSV export)
 ```
 
 Set `CHROME_BIN=/path/to/chrome` to use a specific browser binary, or
@@ -42,7 +43,8 @@ Set `CHROME_BIN=/path/to/chrome` to use a specific browser binary, or
 | Register | invalid phone rejection, badge preview, consent gate, GPS capture, success panel, normalised phone persisted, last-donation stored |
 | Emergency | seeded list, countdown timer, request save (group/units/normalised phone/deadline), share dialog, live board update |
 | My donor | profile found, donation logged → listing paused |
-| Admin | gate blocks anonymous/offline, data layer CRUD, verify/fulfil/announcement actions, dashboard renders for an allow-listed UID, tables, announcement publish → appears on home, message inbox |
+| Admin | gate blocks anonymous/offline, data layer CRUD, verify/fulfil/announcement actions, dashboard renders for an allow-listed UID, tables, announcement publish → appears on home, message inbox, hidden announcements stay listed |
+| Export | donor + request CSV download, file name, UTF-8 BOM, CRLF, every column present, phone normalisation, eligibility maths, quoted notes, formula-injection guard, demo rows excluded by default, filter-aware export, dialog counts, sign-out clears the table |
 | Static | manifest JSON, service worker MIME |
 | Responsive | no horizontal overflow at 390 px on 4 pages |
 | Health | no unexpected console errors, no uncaught page errors |

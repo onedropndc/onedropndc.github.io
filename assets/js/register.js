@@ -7,7 +7,7 @@ import { addDonor, updateDonor, listDonors, isLive, nextEligibleDate } from './d
    profile on a new device. No OTP, no account, no extra signup steps. */
 const hashRecovery = (s) => { let h = 5381; for (const c of String(s).toUpperCase().replace(/\s/g, '')) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
 const makeRecoveryCode = () => 'OD-' + Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
-import { icon, toast, bootUI, dialog, shareUrl, copyText, bloodBadge, avatar, escapeHtml as _e } from './ui.js';
+import { icon, toast, bootUI, dialog, shareUrl, copyText, bloodBadge, avatar, communityCard, wireCommunity, escapeHtml as _e } from './ui.js';
 import { DISTRICTS, getPosition } from './geo.js';
 import { DONATION_COOLDOWN_DAYS, LS } from './config.js';
 import { waitForAuth } from './firebase.js';
@@ -242,8 +242,10 @@ function showSuccess(d, code) {
         <a class="btn btn-ghost" href="my-donor.html">${icon('user')} Edit my profile anytime</a>
         <a class="btn btn-ghost" href="donors.html?group=${encodeURIComponent(d.bloodGroup)}">See the directory</a>
       </div>
-      <p class="muted small">${isLive() ? 'Saved to the shared cloud database.' : 'Saved on this device (offline mode) — it will sync when Firebase is reachable.'}</p>
+      ${communityCard('success')}
+      <p class="muted small" style="margin-top:1rem">${isLive() ? 'Saved to the shared cloud database.' : 'Saved on this device (offline mode) — it will sync when Firebase is reachable.'}</p>
     </div>`;
+  wireCommunity(panel);
   panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
   panel.querySelector('#btnCopyCode')?.addEventListener('click', async () => {
     const ok = await copyText(code);
@@ -306,7 +308,10 @@ export async function initMyDonor() {
         <button class="btn btn-ghost" id="btnLogDonation">${icon('drop')} I donated today</button>
         <button class="btn btn-ghost danger" id="btnRemoveProfile">${icon('trash')} Remove my listing</button>
       </div>
-    </div>`;
+    </div>
+    ${communityCard('donor')}`;
+
+  wireCommunity(host);
 
   function wireRecovery() {
     host.querySelector('#btnRecover')?.addEventListener('click', () => {
