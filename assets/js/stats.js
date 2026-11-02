@@ -3,17 +3,19 @@
 import { BLOOD_GROUPS, GROUP_META, compatibleDonorGroups, daysBetween } from './blood.js';
 import { countUp, escapeHtml, bloodBadge, icon } from './ui.js';
 import { DONATION_COOLDOWN_DAYS } from './config.js';
+import { nextEligibleDate } from './data.js';
+const ready = d => d.available !== false && d.status !== 'suspended' && (!nextEligibleDate(d) || new Date(nextEligibleDate(d)) <= new Date());
 
 export function computeStats(donors) {
   const list = Array.isArray(donors) ? donors : [];
-  const active = list.filter((d) => d.available !== false && d.status !== 'suspended');
+  const active = list.filter(ready);
   const byGroup = {};
   BLOOD_GROUPS.forEach((g) => { byGroup[g] = { total: 0, available: 0 }; });
   list.forEach((d) => {
     const g = String(d.bloodGroup || '').toUpperCase();
     if (!byGroup[g]) return;
     byGroup[g].total += 1;
-    if (d.available !== false && d.status !== 'suspended') byGroup[g].available += 1;
+    if (ready(d)) byGroup[g].available += 1;
   });
   const districts = new Set(list.map((d) => d.district).filter(Boolean));
   const donations = list.reduce((s, d) => s + (Number(d.donations) || 0), 0);
@@ -56,14 +58,13 @@ export function renderStats(host, donors) {
   host.innerHTML = `
     <div class="stat-grid">
       ${statCard('Registered donors', s.total, 'people who said yes', 'user', 355)}
-      ${statCard('Available now', s.active, 'ready within hours', 'drop', 0)}
+      ${statCard('Available now', s.active, 'self-reported availability', 'drop', 0)}
       ${statCard('Districts covered', s.districts, 'across Bangladesh', 'pin', 12)}
       ${statCard('Donations logged', s.donations, 'by this community', 'heart', 330)}
     </div>
     <div class="panel breakdown" aria-label="Donors by blood group">
       <div class="panel-head">
         <h3>Donors by blood group</h3>
-        <span class="muted small">Tap a bar to search that group</span>
       </div>
       <div class="bars">
         ${BLOOD_GROUPS.map((g) => {
@@ -99,7 +100,7 @@ function statCard(label, value, sub, ico, hue) {
 export function initEligibilityWidget(host) {
   if (!host) return;
   if (!host) return;
-  const options = BLOOD_GROUPS.map((g) => `<option value="${g}">${g} — ${GROUP_META[g].label}</option>`).join('');
+  const options = BLOOD_GROUPS.map((g) => `<option value="${g}">${g}</option>`).join('');
   const today = new Date().toISOString().slice(0, 10);
   host.innerHTML = `
     <div class="elig">
@@ -145,7 +146,7 @@ export function initEligibilityWidget(host) {
       ring.style.strokeDashoffset = 0;
       num.textContent = 'GO';
       unit.textContent = 'ready';
-      title.textContent = `You can donate ${g} today`;
+      title.textContent = 'Check with the blood bank';
       text.textContent = 'No previous donation recorded. Eat a proper meal, drink water, bring your national ID — and remember: one donation can help up to three patients.';
       return;
     }
@@ -156,14 +157,14 @@ export function initEligibilityWidget(host) {
     if (left === 0) {
       out.classList.add('is-ok');
       num.textContent = 'GO'; unit.textContent = 'ready';
-      title.textContent = `Cooling-off complete — ${g} donor ready`;
+      title.textContent = 'Check with the blood bank';
       text.textContent = `It has been ${passed} days since your last donation. Thank you for coming back; hospitals always need repeat donors.`;
     } else {
       out.classList.remove('is-ok');
       num.textContent = String(left); unit.textContent = 'days left';
       const when = new Date(); when.setDate(when.getDate() + left);
       title.textContent = 'Almost there — rest and hydrate';
-      text.textContent = `${DONATION_COOLDOWN_DAYS - left} of ${DONATION_COOLDOWN_DAYS} days done. You will be eligible again on ${when.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}. Your body is rebuilding red cells right now.`;
+      text.textContent = `${DONATION_COOLDOWN_DAYS - left} of ${DONATION_COOLDOWN_DAYS} days done. The display filter ends on ${when.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}. The blood bank determines when you can donate again.`;
     }
   };
   host.querySelector('#eligBtn').addEventListener('click', paint);
@@ -174,7 +175,7 @@ export function initEligibilityWidget(host) {
 /* --------------------------------------------- compatibility */
 export function initCompatibilityWidget(host) {
   if (!host) return;
-  const options = BLOOD_GROUPS.map((g) => `<option value="${g}">${g} — ${GROUP_META[g].label}</option>`).join('');
+  const options = BLOOD_GROUPS.map((g) => `<option value="${g}">${g}</option>`).join('');
   host.innerHTML = `
     <div class="compat">
       <div class="compat-pick">
@@ -193,7 +194,7 @@ export function initCompatibilityWidget(host) {
         <h4>Can receive from</h4>
         <div class="compat-chips">${BLOOD_GROUPS.map((x) => `<span class="chip-static ${can.includes(x) ? 'yes' : 'no'}">${x}</span>`).join('')}</div>
       </div>
-      <p class="compat-note">${escapeHtml(GROUP_META[g].note)}. In an emergency, doctors decide what is safe — this chart is a guide for finding matching donors faster.</p>
+      <p class="compat-note">This is a basic red-cell compatibility guide. The blood bank and treating clinician make the final decision.</p>
       <a class="btn btn-primary btn-sm" href="donors.html?group=${encodeURIComponent(can[0])}&compat=${encodeURIComponent(g)}">Find ${escapeHtml(can[0])} donors →</a>`;
   };
   sel.addEventListener('change', paint);

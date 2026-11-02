@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -29,7 +29,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=2.1.0">
 
   <meta name="robots" content="noindex, nofollow">
 </head>
@@ -70,26 +70,17 @@
           </form>
 
           <details class="faq-item" style="margin-top:1.1rem">
-            <summary>First time? Create the moderator account (one-time, ~2 minutes)</summary>
+            <summary>Moderator access and security</summary>
             <div class="faq-body">
-              1. In the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">Firebase console</a>,
-              open <strong>Authentication → Sign-in method</strong> and enable <strong>Email/Password</strong>.<br>
-              2. Open <strong>Authentication → Users → Add user</strong>, enter the moderator email
-              and a strong password, and save.<br>
-              3. Publish <code>firestore.rules</code> under <strong>Firestore → Rules</strong>.<br>
-              4. Sign in on this page. The session stays signed in on this device.<br><br>
-              <strong>Roles:</strong> the owner email listed in <code>OWNER_EMAILS</code> (and in the rules)
-              gets full control, including deletes. Every other console account is a
-              <em>moderator</em>: approve requests, verify donors, read the inbox, publish notices —
-              but can never delete or edit existing records. The limits are enforced by the
-              database rules, not just the interface.
+              Ask the project owner to arrange a moderator account. Access depends on the authentication settings and Firestore rules actually deployed.<br><br>
+              The proposed repository rules can treat any password-provider account as staff. Do not enable public email/password sign-up or publish rules without an owner-approved role design and staging tests. The dashboard alone is not an access-control system.
             </div>
           </details>
         </div>
 
         <div id="adminPanel" hidden>
           <div class="admin-session">
-            <span class="muted small">Signed in as <strong id="adminEmailOut"></strong> · <span id="adminRoleOut" class="muted small"></span></span>
+            <span class="muted small">Signed in as <strong id="adminEmailOut" data-no-translate></strong> · <span id="adminRoleOut" class="muted small"></span></span>
             <button class="btn btn-ghost btn-xs" id="adminSignOut" type="button">Sign out</button>
           </div>
           <div class="admin-tabs" role="tablist" aria-label="Dashboard sections">

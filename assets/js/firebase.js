@@ -28,6 +28,8 @@ export function initFirebase() {
 }
 
 async function boot() {
+  // Arena preview is deliberately isolated from the production Firebase project.
+  if (location.hostname.endsWith(".e2b.app")) { state.error = "Preview mode: live database disabled"; return state; }
   try {
     const [{ initializeApp }, firestore, auth] = await Promise.all([
       import(`${CDN}/firebase-app.js`),

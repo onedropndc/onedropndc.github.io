@@ -1,3 +1,4 @@
+import { initLanguage } from './i18n.js';
 /* =============================================================
    UI kit — app shell, toasts, dialogs, share sheet, phone reveal,
    PWA install, scroll reveal, animated counters.
@@ -43,33 +44,33 @@ export function icon(name, cls = '') {
 const COMMUNITY_PRESETS = {
   default: {
     title: 'Join the One Drop WhatsApp community',
-    text: `${WHATSAPP.tagline} Verified requests only — leave any time.`,
+    text: 'Join the optional community to share requests and connect with volunteers.',
     cta: 'Join the community',
-    note: 'Verified requests · No spam · Leave any time'
+    note: 'Participation is optional · Leave any time'
   },
   sidebar: {
     title: 'Join the One Drop community',
-    text: 'Emergency requests, camp announcements and donor tips reach your phone first.',
+    text: 'Connect with volunteers and share requests in the optional community.',
     cta: 'Join on WhatsApp',
-    note: 'Free · No spam · Leave any time'
+    note: 'Participation is optional · Leave any time'
   },
   success: {
-    title: 'One last step — join the community',
-    text: 'Your profile is live. Join the WhatsApp community so an urgent request reaches you even when this tab is closed.',
+    title: 'Join the community if you wish',
+    text: 'Your profile is saved. Joining the WhatsApp community is optional.',
     cta: 'Join the community',
-    note: 'Your number is never shown on this website'
+    note: 'Your contact number is accessible in the directory data'
   },
   donor: {
     title: 'Stay in the loop',
-    text: 'Verified requests, donation camps and quiet thank-yous from other donors — in one place.',
+    text: 'Connect with volunteers and share requests in the optional community.',
     cta: 'Open the community',
     note: 'Leave the community any time'
   },
   emergency: {
     title: 'Need more eyes on this request?',
-    text: 'Paste the request link in the One Drop community — every member sees it the moment you press send.',
+    text: 'Share a request link in the community to reach more people.',
     cta: 'Open the community',
-    note: 'Most matches start with a forwarded message'
+    note: 'Confirm details with the hospital'
   }
 };
 
@@ -129,12 +130,12 @@ function mountCommunityPlaceholders(root = document) {
 
 /* ------------------------------------------------- app shell */
 const NAV = [
-  { href: 'index.html',     label: 'Home',      id: 'home' },
-  { href: 'donors.html',    label: 'Find Donor', id: 'donors' },
-  { href: 'emergency.html', label: 'Emergency',  id: 'emergency' },
-  { href: 'register.html',  label: 'Become a Donor', id: 'register' },
-  { href: 'about.html',     label: 'About',      id: 'about' },
-  { href: 'faq.html',       label: 'FAQ',        id: 'faq' }
+  { href: 'index.html',     label: 'হোম',      id: 'home' },
+  { href: 'donors.html',    label: 'ডোনার খুঁজুন', id: 'donors' },
+  { href: 'emergency.html', label: 'জরুরি অনুরোধ',  id: 'emergency' },
+  { href: 'register.html',  label: 'রক্তদাতা হোন', id: 'register' },
+  { href: 'about.html',     label: 'আমাদের সম্পর্কে',      id: 'about' },
+  { href: 'faq.html',       label: 'প্রশ্নোত্তর',        id: 'faq' }
 ];
 
 export function mountShell(active = 'home') {
@@ -160,23 +161,26 @@ export function mountShell(active = 'home') {
       </a>
       <nav class="nav desktop" aria-label="Main navigation">${navLinks}</nav>
       <div class="header-actions">
+        <button class="language-switch" type="button" data-language-switch aria-label="Switch to English">EN</button>
         <a class="icon-btn" href="my-donor.html" aria-label="My donor profile" title="My donor profile">${icon('user')}</a>
         <button class="icon-btn" id="btnNotify" aria-pressed="false" aria-label="Turn on emergency alerts">
           ${icon('bell')}<span class="dot" hidden></span>
         </button>
-        <a class="btn btn-primary btn-sm" href="emergency.html" aria-label="Post an emergency blood request">${icon('siren')}<span>Request Blood</span></a>
+        <a class="btn btn-primary btn-sm" href="emergency.html" aria-label="Post an emergency blood request">${icon('siren')}<span>রক্তের অনুরোধ</span></a>
         <button class="icon-btn only-mobile" id="btnMenu" aria-expanded="false" aria-controls="mobileNav" aria-label="Open menu">${icon('menu')}</button>
       </div>
     </div>
     <nav class="nav mobile" id="mobileNav" hidden aria-label="Mobile navigation">${navLinks}
       <div class="mob-extra">
         <a href="my-donor.html" class="navlink ${active === 'mydonor' ? 'is-active' : ''}">${icon('user')}<span>My donor profile</span></a>
+        <a href="donor-card.html" class="navlink ${active === 'donor-card' ? 'is-active' : ''}">${icon('download')}<span>Create donor card</span></a>
         <a href="${WHATSAPP.url}" class="navlink navlink-wa" target="_blank" rel="noopener noreferrer">${icon('whatsapp')}<span>Join our WhatsApp community</span></a>
         <a href="privacy.html#contact" class="navlink">${icon('chat')}<span>Contact the team</span></a>
       </div>
     </nav>
   </header>
-  <div class="netbar" id="netbar" hidden>${icon('wifi')}<span>Offline — showing the last saved data. Requests you make are stored on this device.</span></div>`);
+  ${location.hostname.endsWith(".e2b.app") ? '<div class="preview-notice">প্রিভিউ মোড: আসল ডেটাবেস সংযুক্ত নয়; এখানে কোনো তথ্য জমা হবে না।</div>' : ''}
+  <div class="netbar" id="netbar" hidden>${icon('wifi')}<span>সংযোগ নেই — পুরোনো তথ্য দেখানো হতে পারে। অনুরোধ বা প্রোফাইল জমা দিতে ইন্টারনেট প্রয়োজন।</span></div>`);
 
   document.body.insertAdjacentHTML('beforeend', `
   <footer class="site-footer">
@@ -186,7 +190,7 @@ export function mountShell(active = 'home') {
           <span class="brand-mark"><img class="brand-img" src="assets/img/logo-drop.png" alt=""></span>
           <span class="brand-text"><strong>One<span class="brand-accent-light">Drop</span></strong><em>${APP.tagline}</em></span>
         </a>
-        <p>A volunteer-run blood donor network built by students, for everyone who has ever stood helpless in front of a hospital blood bank.</p>
+        <p>A student-led volunteer community helping people connect when blood is needed.</p>
         <div class="footer-cta">
           <a class="btn btn-light btn-sm" href="register.html">${icon('plus')} Become a donor</a>
           <button class="btn btn-ghost-light btn-sm" id="btnInstallFooter">${icon('download')} Install app</button>
@@ -195,7 +199,7 @@ export function mountShell(active = 'home') {
           <span class="footer-wa-ico" aria-hidden="true">${ICONS.whatsapp}</span>
           <span class="footer-wa-text">
             <strong>WhatsApp community</strong>
-            <em>Verified requests, straight to your phone</em>
+            <em>Connect with other volunteers</em>
           </span>
           <span class="footer-wa-go" aria-hidden="true">↗</span>
         </a>
@@ -206,6 +210,7 @@ export function mountShell(active = 'home') {
         <a href="emergency.html">Emergency requests</a>
         <a href="register.html">Register as donor</a>
         <a href="my-donor.html">My donor profile</a>
+        <a href="donor-card.html">Create donor card</a>
       </div>
       <div class="footer-col">
         <h3>Learn</h3>
@@ -229,17 +234,17 @@ export function mountShell(active = 'home') {
       </p>
       <p class="credit-meta">
         ${APP.emergencyHotline ? `<a class="hotline" href="tel:${APP.emergencyHotline}">Hotline ${APP.emergencyHotline}</a> · ` : ''}
-        v${APP_VERSION} · Not a substitute for hospital blood banks. Always verify through the hospital.
+        <span>v${APP_VERSION} · </span><span>Not a substitute for hospital blood banks. Always verify through the hospital.</span>
       </p>
     </div>
   </footer>
 
   <nav class="bottom-bar only-mobile" aria-label="Quick actions">
-    <a href="index.html" class="bb-item ${active === 'home' ? 'is-active' : ''}">${icon('drop')}<span>Home</span></a>
-    <a href="donors.html" class="bb-item ${active === 'donors' ? 'is-active' : ''}">${icon('search')}<span>Find</span></a>
-    <a href="emergency.html" class="bb-item bb-urgent" aria-label="Post an emergency blood request">${icon('siren')}<span>Emergency</span></a>
-    <a href="register.html" class="bb-item ${active === 'register' ? 'is-active' : ''}">${icon('user')}<span>Register</span></a>
-    <a href="my-donor.html" class="bb-item ${active === 'mydonor' ? 'is-active' : ''}">${icon('user')}<span>Profile</span></a>
+    <a href="index.html" class="bb-item ${active === 'home' ? 'is-active' : ''}">${icon('drop')}<span>হোম</span></a>
+    <a href="donors.html" class="bb-item ${active === 'donors' ? 'is-active' : ''}">${icon('search')}<span>খুঁজুন</span></a>
+    <a href="emergency.html" class="bb-item bb-urgent" aria-label="Post an emergency blood request">${icon('siren')}<span>জরুরি</span></a>
+    <a href="register.html" class="bb-item ${active === 'register' ? 'is-active' : ''}">${icon('user')}<span>নিবন্ধন</span></a>
+    <a href="my-donor.html" class="bb-item ${active === 'mydonor' ? 'is-active' : ''}">${icon('user')}<span>প্রোফাইল</span></a>
   </nav>
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
@@ -300,7 +305,7 @@ export function toast(message, type = 'info', timeout = 4200) {
 }
 
 /* --------------------------------------------------- dialogs */
-export function dialog({ title, body, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary', hideCancel = false }) {
+export function dialog({ title, body, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary', hideCancel = false, translateTitle = true }) {
   const root = document.getElementById('modalRoot') || (() => { const d = document.createElement('div'); d.id = 'modalRoot'; d.className = 'modal-root'; document.body.appendChild(d); return d; })();
   return new Promise((resolve) => {
     const wrap = document.createElement('div');
@@ -308,7 +313,7 @@ export function dialog({ title, body, confirmText = 'Confirm', cancelText = 'Can
     wrap.innerHTML = `
       <div class="modal-backdrop" data-close></div>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-        <h2 id="dlgTitle">${escapeHtml(title)}</h2>
+        <h2 id="dlgTitle"${translateTitle ? '' : ' data-no-translate'}>${escapeHtml(title)}</h2>
         <div class="modal-body">${body}</div>
         <div class="modal-actions">
           ${hideCancel ? '' : `<button class="btn btn-ghost" data-close>${escapeHtml(cancelText)}</button>`}
@@ -414,7 +419,7 @@ export function escapeHtml(s) {
 
 export function bloodBadge(group, size = 'md') {
   const g = String(group || '').toUpperCase();
-  return `<span class="badge-blood badge-${size}" data-group="${escapeHtml(g)}" role="img" aria-label="Blood group ${g.replace('+', ' positive').replace('-', ' negative')}">
+  return `<span class="badge-blood badge-${size}" data-group="${escapeHtml(g)}" role="img" aria-label="Blood group ${escapeHtml(g.replace('+', ' positive').replace('-', ' negative'))}">
     <span class="bb-type">${escapeHtml(g)}</span>
   </span>`;
 }
@@ -475,10 +480,8 @@ export function initPWA() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('service-worker.js').catch((err) => console.warn('SW failed', err));
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return; refreshing = true; location.reload();
-      });
+      // Never reload while someone is filling an emergency form. The new
+      // worker will be used on the next navigation instead.
     });
   }
 }
@@ -524,8 +527,8 @@ export function initNotifyButton() {
     if (perm === 'granted') {
       localStorage.setItem(LS.NOTIFY, '1');
       btn.setAttribute('aria-pressed', 'true'); if (dot) dot.hidden = false;
-      new Notification('One Drop alerts on', { body: 'You will be alerted when a new urgent blood request is posted.', icon: 'assets/icons/icon-192.png' });
-      toast('You will be alerted about new urgent requests.', 'success');
+      new Notification('One Drop alerts on', { body: 'While this page is open, you may receive alerts for new approved requests.', icon: 'assets/icons/icon-192.png' });
+      toast('Alerts may appear while the site is open; delivery is not guaranteed.', 'success');
     } else {
       toast('Notification permission was blocked. Enable it in browser settings.', 'error');
     }
@@ -549,6 +552,7 @@ export function modePill(mode, count) {
 /* ------------------------------------------------ boot combo */
 export function bootUI(active) {
   mountShell(active);
+  initLanguage();
   mountCommunityPlaceholders();
   initReveal();
   initPWA();

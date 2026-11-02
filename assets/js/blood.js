@@ -27,14 +27,14 @@ export const DONATES_TO = {
 };
 
 export const GROUP_META = {
-  'A+':  { label: 'A Positive',  hue: 355, note: '2nd most common group in Bangladesh' },
-  'A-':  { label: 'A Negative',  hue: 348, note: 'Rare — about 1 in 100 people' },
+  'A+':  { label: 'A Positive',  hue: 355 },
+  'A-':  { label: 'A Negative',  hue: 348 },
   'B+':  { label: 'B Positive',  hue: 12,  note: 'Most common group in Bangladesh' },
   'B-':  { label: 'B Negative',  hue: 6,   note: 'Rare — about 1 in 100 people' },
-  'AB+': { label: 'AB Positive', hue: 330, note: 'Universal plasma donor' },
-  'AB-': { label: 'AB Negative', hue: 322, note: 'Rarest group — roughly 1 in 200' },
+  'AB+': { label: 'AB Positive', hue: 330 },
+  'AB-': { label: 'AB Negative', hue: 322 },
   'O+':  { label: 'O Positive',  hue: 0,   note: 'High demand in every hospital' },
-  'O-':  { label: 'O Negative',  hue: 352, note: 'Universal red-cell donor — golden group' }
+  'O-':  { label: 'O Negative',  hue: 352 }
 };
 
 export function canDonateTo(from, to) {

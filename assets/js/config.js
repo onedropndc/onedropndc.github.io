@@ -29,7 +29,7 @@ export const OWNER_EMAILS = ['foysal.cyber@gmail.com'];
    canonical tags, Open Graph cards and the sitemap point correctly. */
 export const SITE_URL  = 'https://onedropndc.github.io';
 export const SITE_NAME = 'One Drop — A Drop of Life';
-export const APP_VERSION = '1.9.0';
+export const APP_VERSION = '2.3.0';
 
 /* Official WhatsApp community.
    Change the invite link in ONE place only. The home-page band, the register
@@ -67,7 +67,7 @@ export const DONATION_COOLDOWN_DAYS = 56;
 /* Seed the very first visit with realistic sample donors so the site
    never looks empty. Flip to false once real data starts coming in —
    already-seeded browsers can clear it in admin.html → Data tools. */
-export const SEED_DEMO_DATA = true;
+export const SEED_DEMO_DATA = false;
 
 /* Local cache keys */
 export const LS = {

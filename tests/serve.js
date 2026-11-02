@@ -11,6 +11,7 @@ const MIME = {
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.xml': 'application/xml',
@@ -38,7 +39,7 @@ function chromiumPath() {
   const cache = path.join(require('os').homedir(), '.cache/ms-playwright');
   if (!fs.existsSync(cache)) return null;
   for (const dir of fs.readdirSync(cache).sort().reverse()) {
-    for (const cand of ['chrome-linux/chrome', 'chrome-linux/headless_shell']) {
+    for (const cand of ['chrome-linux/chrome', 'chrome-linux64/chrome', 'chrome-linux/headless_shell', 'chrome-headless-shell-linux64/chrome-headless-shell']) {
       const p = path.join(cache, dir, cand);
       if (fs.existsSync(p)) return p;
     }

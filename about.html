@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -30,7 +30,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=2.1.0">
 
   <script type="application/ld+json">
   {
@@ -50,9 +50,8 @@
     <section class="page-hero">
       <div class="wrap">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a> <span>/</span> <span>About</span></nav>
-        <h1>Built by students. Measured in minutes. Open to everyone in Bangladesh.</h1>
-        <p>One Drop is planned, written and maintained by students of Notre Dame College, Dhaka — Batch 27.
-        Free forever, volunteer-run, and designed for the moments when a hospital says “we need blood now.”</p>
+        <h1>About One Drop</h1>
+        <p>One Drop is a volunteer initiative by Notre Dame College, Dhaka, Batch 27 students. It helps people find donors and share blood requests.</p>
       </div>
     </section>
 
@@ -60,28 +59,11 @@
       <div class="wrap split-2">
         <div class="prose" data-reveal>
           <span class="kicker" style="display:inline-flex;align-items:center;gap:.45rem;font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--red-700)">Why we built it</span>
-          <h2>Started from a phone call that came too late</h2>
-          <p>
-            Like most things that matter, it began with a bad night. A relative of one of our classmates was admitted
-            after a road accident, and the blood bank asked for two bags of O− by morning. What followed is what always
-            follows in Bangladesh: a panic of phone calls, forwarded contacts, half-remembered numbers — while the clock
-            kept moving. The blood arrived in time. But it left us with a question we could not put down: why was there no
-            single place to ask, <em>“who near me can donate today?”</em>
-          </p>
-          <p>
-            One Drop is that place. Registering as a voluntary donor takes under a minute. Searching the directory needs no
-            account at all. And when a family posts an emergency request, every volunteer with alerts enabled hears about it
-            at the same moment — not one forwarded phone call at a time.
-          </p>
-          <p>
-            We are not a blood bank. We do not collect, screen, store or transport blood. We shorten the distance between a
-            request and a willing arm — and we do it while keeping donors’ phone numbers off the public page.
-          </p>
+          <h2>Connecting people who need blood with voluntary donors</h2>
+          <p>We are not a blood bank. We do not collect, screen, store or transport blood. Contact details in the directory are publicly accessible; please read the privacy policy before registering.</p>
 
           <div class="callout">
-            <p><strong>Ground rules we follow:</strong> every listing is voluntary, unpaid and non-commercial. Selling blood
-            is illegal in Bangladesh and against everything this project stands for. Moderators remove any listing that
-            looks fake, paid or misleading.</p>
+            <p><strong>Our principles:</strong> Donation should be voluntary and unpaid. Moderators may review or remove misleading, commercial or inappropriate listings.</p>
           </div>
         </div>
 
@@ -90,51 +72,18 @@
           <ul style="display:grid;gap:.7rem;padding-left:0;list-style:none">
             <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">A searchable donor directory with blood-group, district and distance filters</span></li>
             <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">A live emergency board with countdown timers</span></li>
-            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">Browser alerts when a new urgent request is posted</span></li>
-            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">Masked phone numbers with rate-limited reveal</span></li>
-            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">A 56-day cooling-off tracker so donors are not over-asked</span></li>
-            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">An installable offline-capable app (PWA)</span></li>
+            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">Browser alerts may appear while the site is open</span></li>
+            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">Contact numbers are accessible in the public directory data</span></li>
+            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">A display filter based on the last donation date</span></li>
+            <li style="display:flex;gap:.6rem"><span style="color:var(--ok);flex:none">✓</span><span class="small">An installable app with limited offline access to cached information</span></li>
           </ul>
           <h3 style="margin:1.4rem 0 .6rem">What it does not do</h3>
           <ul class="muted small" style="padding-left:1.1rem;display:grid;gap:.4rem">
             <li>Store, screen or supply blood</li>
             <li>Replace a hospital blood bank or a doctor’s decision</li>
-            <li>Charge donors or patients anything, ever</li>
+            <li>Charge a fee for using the site</li>
           </ul>
         </aside>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <div class="section-head" data-reveal>
-          <span class="kicker">Field notes</span>
-          <h2>What this looks like under pressure</h2>
-          <p>Three composite scenes, assembled from situations families have described to us. Names and details are changed;
-          the sequence is exactly how the tools on this site are designed to behave.</p>
-        </div>
-        <div class="team-grid">
-          <article class="team-card" data-reveal>
-            <strong>02:40 — postpartum haemorrhage, Dhaka</strong>
-            <span>The hospital needs O− within the hour and the family knows nobody with that group. From the waiting room
-            they post a request. Three volunteers with alerts on see it immediately; the nearest — a student four kilometres
-            away — taps “Offer to donate”, calls the attendant to confirm, and reaches the blood bank before shift change.
-            The request is marked fulfilled at 04:05.</span>
-          </article>
-          <article class="team-card" data-reveal>
-            <strong>A regular transfusion, a reliable circle</strong>
-            <span>A thalassemia patient needs blood every third week. Instead of rebuilding a contact list each cycle, the
-            family searches the directory and quietly builds a small rotation of willing donors. The 56-day cooling-off
-            tracker means nobody is ever asked too soon — and each donor can see for themselves exactly when they become
-            eligible again.</span>
-          </article>
-          <article class="team-card" data-reveal>
-            <strong>When the exact group isn’t available</strong>
-            <span>A district shows zero exact-match donors at 2 a.m. The compatibility chart becomes the most valuable thing
-            on the page: the family calls two compatible-group donors instead of waiting for an impossible match, and the
-            blood bank later confirms the alternative was precisely what they would have requested.</span>
-          </article>
-        </div>
       </div>
     </section>
 
@@ -143,9 +92,10 @@
         <div class="section-head" data-reveal>
           <span class="kicker">Reference</span>
           <h2>Red-cell compatibility chart</h2>
-          <p>Use this to decide which donors are worth calling first. Final decisions always belong to the treating doctor and the blood bank.</p>
+          <p>This is a basic red-cell compatibility guide. Confirm the appropriate blood type with the treating clinician and blood bank.</p>
         </div>
-        <div class="panel" data-reveal style="overflow-x:auto">
+        <p class="table-scroll-hint">Scroll sideways to see all blood groups.</p>
+        <div class="panel" data-reveal style="overflow-x:auto" tabindex="0" role="region" aria-label="Red-cell compatibility chart">
           <table class="compat-table">
             <caption class="muted small" style="caption-side:bottom;padding-top:.8rem;text-align:left">✓ = compatible for red-cell transfusion</caption>
             <thead>
@@ -169,33 +119,26 @@
         <div class="team-grid">
           <article class="team-card" data-reveal>
             <strong>Idea &amp; initiative</strong>
-            <span>Students of Notre Dame College, Dhaka — Batch 27. Research, planning, writing, and day-to-day
-            community moderation.</span>
+            <span>Students of Notre Dame College, Dhaka — Batch 27. The idea and initiative behind One Drop.</span>
           </article>
           <article class="team-card" data-reveal>
             <strong>Conceived &amp; developed by</strong>
-            <span>Foysal Mahmud — cyber-security specialist and ethical hacker; conceived One Drop and leads its product
-            design, engineering, Firebase architecture, security and deployment.</span>
+            <span>Foysal Mahmud — planning, design and development of One Drop.</span>
             <a class="link-btn" href="https://foysalcyber.github.io/" target="_blank" rel="noopener noreferrer" style="margin-top:.5rem;display:inline-block">Full profile — foysalcyber.github.io ↗</a>
-            <a class="link-btn" href="https://foysalcyber.github.io/#contact" target="_blank" rel="noopener noreferrer" style="margin-top:.35rem;display:inline-block">Urgent? Contact the developer directly ↗</a>
+            <a class="link-btn" href="https://foysalcyber.github.io/#contact" target="_blank" rel="noopener noreferrer" style="margin-top:.35rem;display:inline-block">Contact the developer ↗</a>
           </article>
           <article class="team-card" data-reveal>
             <strong>Volunteer moderators</strong>
-            <span>Classmates who verify listings by phone, review reports, and keep the emergency board accurate and honest.</span>
+            <span>Volunteer moderators can review listings, reports and emergency requests.</span>
           </article>
           <article class="team-card" data-reveal>
             <strong>Technology</strong>
-            <span>Deliberately simple: hand-written HTML/CSS/JS, Firebase Authentication and Firestore, and a service worker
-            for offline use. No trackers, no advertising, no data sold — ever.</span>
+            <span>Built with HTML, CSS, JavaScript, Firebase Authentication and Firestore, with limited offline access.</span>
           </article>
         </div>
 
         <div class="callout ok" style="margin-top:1.6rem" data-reveal>
-          <p><strong>Want to help?</strong> A directory is only as strong as the donors inside it. Share this site with your
-          class, your hall, your mosque and temple committees, your neighbourhood group — or
-          <a href="https://chat.whatsapp.com/EbbmwOw6kdCKToOjH6uznl" target="_blank" rel="noopener noreferrer">join the One Drop
-          WhatsApp community</a> and forward the requests that match your friends’ blood groups. Corrections and suggestions
-          are always welcome through the <a href="privacy.html#contact">contact form</a>.</p>
+          <p><strong>Want to help?</strong> Share One Drop with people you know, or <a href="https://chat.whatsapp.com/EbbmwOw6kdCKToOjH6uznl" target="_blank" rel="noopener noreferrer">join the WhatsApp community</a>. <a href="privacy.html#contact">Let us know if something needs correcting.</a></p>
         </div>
       </div>
     </section>

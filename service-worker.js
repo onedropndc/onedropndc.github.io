@@ -2,7 +2,7 @@
    App-shell cache first, network-first for navigation (so new deploys
    are picked up), runtime cache for the Firebase CDN modules. */
 
-const VERSION = 'onedrop-v2.0.0';
+const VERSION = 'onedrop-v3.2.0';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
@@ -17,9 +17,12 @@ const APP_SHELL = [
   'privacy.html',
   'admin.html',
   'my-donor.html',
+  'donor-card.html',
   'offline.html',
-  'assets/css/main.css?v=1.9.0',
+  'assets/css/main.css?v=2.1.0',
+  'assets/fonts/noto-sans-bengali.woff2',
   'assets/js/config.js',
+  'assets/js/i18n.js',
   'assets/js/csv.js',
   'assets/js/firebase.js',
   'assets/js/data.js',
@@ -29,14 +32,18 @@ const APP_SHELL = [
   'assets/js/stats.js',
   'assets/js/donors-board.js',
   'assets/js/emergency.js',
+  'assets/js/cards.js',
+  'assets/js/donor-card.js',
   'assets/js/register.js',
   'assets/js/admin.js',
   'assets/js/analytics.js',
   'assets/js/app.js',
+  'assets/js/hero-scene.js',
   'favicon.ico',
   'assets/icons/favicon-32.png',
   'assets/icons/apple-touch-icon.png',
   'assets/img/logo-drop.png',
+  'assets/img/people-donation.jpg',
   'assets/img/logo-full.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
@@ -98,14 +105,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin assets: cache first, then network.
+  // Prefer fresh app assets so deployed code and translations do not remain
+  // stale. A previously cached asset remains available if the network fails.
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(RUNTIME).then((c) => c.put(req, copy)).catch(() => {});
+      fetch(req).then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(RUNTIME).then((c) => c.put(req, copy)).catch(() => {}); }
         return res;
-      }).catch(() => caches.match('offline.html')))
+      }).catch(async () => (await caches.match(req)) || Response.error())
     );
   }
 });

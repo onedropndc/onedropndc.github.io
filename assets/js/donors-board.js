@@ -4,7 +4,7 @@ import { BLOOD_GROUPS, GROUP_META, timeAgo, formatDate } from './blood.js';
 import { compatibleDonorGroups } from './blood.js';
 import { subscribeDonors, updateDonor, deleteDonor, isLive, nextEligibleDate } from './data.js';
 import { icon, bloodBadge, avatar, toast, dialog, shareUrl, revealPhone, modePill, initReveal, escapeHtml as _e } from './ui.js';
-import { DISTRICTS, donorCoords, haversineKm, distanceLabel, getPosition } from './geo.js';
+import { DISTRICTS, DISTRICT_LABELS, donorCoords, haversineKm, distanceLabel, getPosition } from './geo.js';
 
 
 const state = {
@@ -43,7 +43,7 @@ export async function initDonorBoard(opts = {}) {
   subscribeDonors((rows, mode) => {
     state.rows = rows; state.mode = mode;
     const pill = document.getElementById('modePill');
-    if (pill) pill.innerHTML = modePill(mode, rows.length);
+    if (pill) pill.innerHTML = modePill(mode);
     render();
   });
 
@@ -56,24 +56,26 @@ function wireControls() {
   const search = $('donorSearch');
   if (search) {
     search.value = state.q;
+    if (state.q) { const details = $('moreFilters'); if (details) details.open = true; }
     let t;
     search.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { state.q = search.value.trim(); state.shown = 24; render(); }, 160); });
   }
 
   document.querySelectorAll('[data-group-chip]').forEach((chip) => {
     chip.classList.toggle('is-active', chip.dataset.groupChip === state.group);
+    chip.setAttribute('aria-pressed', String(chip.dataset.groupChip === state.group));
     chip.addEventListener('click', () => {
       state.group = chip.dataset.groupChip;
       state.compat = '';
       applyCompatBanner();
-      document.querySelectorAll('[data-group-chip]').forEach((c) => c.classList.toggle('is-active', c === chip));
+      document.querySelectorAll('[data-group-chip]').forEach((c) => { c.classList.toggle('is-active', c === chip); c.setAttribute('aria-pressed', String(c === chip)); });
       state.shown = 24; render();
     });
   });
 
   const district = $('districtFilter');
   if (district) {
-    district.innerHTML = `<option value="ALL">All districts</option>` + DISTRICTS.map((d) => `<option value="${d}">${d}</option>`).join('');
+    district.innerHTML = `<option value="ALL">সব জেলা</option>` + DISTRICTS.map((d) => `<option value="${d}">${DISTRICT_LABELS[d] || d}</option>`).join('');
     district.value = state.district;
     district.addEventListener('change', () => { state.district = district.value; state.shown = 24; render(); });
   }
@@ -104,7 +106,7 @@ function wireControls() {
     if (district) district.value = 'ALL';
     if (avail) avail.checked = true;
     if (sort) sort.value = 'recent';
-    document.querySelectorAll('[data-group-chip]').forEach((c) => c.classList.toggle('is-active', c.dataset.groupChip === 'ALL'));
+    document.querySelectorAll('[data-group-chip]').forEach((c) => { c.classList.toggle('is-active', c.dataset.groupChip === 'ALL'); c.setAttribute('aria-pressed', String(c.dataset.groupChip === 'ALL')); });
     applyCompatBanner();
     render();
   });
@@ -120,7 +122,7 @@ function applyCompatBanner() {
     <button class="link-btn" id="clearCompat">Clear</button>`;
   el.querySelector('#clearCompat').addEventListener('click', () => {
     state.compat = ''; state.group = 'ALL';
-    document.querySelectorAll('[data-group-chip]').forEach((c) => c.classList.toggle('is-active', c.dataset.groupChip === 'ALL'));
+    document.querySelectorAll('[data-group-chip]').forEach((c) => { c.classList.toggle('is-active', c.dataset.groupChip === 'ALL'); c.setAttribute('aria-pressed', String(c.dataset.groupChip === 'ALL')); });
     applyCompatBanner(); render();
   });
 }
@@ -147,7 +149,7 @@ function visible() {
   const compat = state.compat ? compatibleDonorGroups(state.compat) : null;
   let out = state.rows.filter((d) => {
     if (d.status === 'suspended') return false;
-    if (state.onlyAvailable && d.available === false) return false;
+    if (state.onlyAvailable && (d.available === false || (nextEligibleDate(d) && new Date(nextEligibleDate(d)) > new Date()))) return false;
     if (state.group !== 'ALL' && String(d.bloodGroup).toUpperCase() !== state.group) return false;
     if (compat && !compat.includes(String(d.bloodGroup).toUpperCase())) return false;
     if (state.district !== 'ALL' && d.district !== state.district) return false;
@@ -185,16 +187,25 @@ function render() {
   if (!host) return;
   const list = visible();
   const countEl = document.getElementById('resultCount');
-  if (countEl) countEl.textContent = `${list.length} donor${list.length === 1 ? '' : 's'} found`;
+  if (countEl) countEl.textContent = state.mode !== 'live' && !state.rows.length ? 'Live donor data unavailable' : `${list.length} donor${list.length === 1 ? '' : 's'} found`;
 
+  if (!list.length && state.mode !== 'live' && !state.rows.length) {
+    host.innerHTML = `<div class="empty"><div class="empty-mark">${icon('wifi')}</div>
+      <h3>Live donor data is unavailable</h3><p>Check your connection and try again. There may still be donors available.</p>
+      <div class="empty-actions"><button class="btn btn-primary" type="button" id="retryDonors">Try again</button>
+      <a class="btn btn-ghost" href="emergency.html#postForm">জরুরি অনুরোধ করুন</a></div></div>`;
+    host.querySelector('#retryDonors')?.addEventListener('click', () => location.reload());
+    const more = document.getElementById('btnMore'); if (more) more.hidden = true;
+    return;
+  }
   if (!list.length) {
     host.innerHTML = `<div class="empty">
       <div class="empty-mark">${icon('search')}</div>
-      <h3>No donor matches these filters</h3>
-      <p>Try clearing the district filter, or include donors who donated recently — they may still be able to help with plasma or platelets.</p>
+      <h3>এই ফিল্টারে কোনো রক্তদাতা পাওয়া যায়নি</h3>
+      <p>অন্য জেলা বা এলাকা দিয়ে খুঁজুন, অথবা জরুরি অনুরোধ করুন। রক্তদানের যোগ্যতা হাসপাতাল নিশ্চিত করবে।</p>
       <div class="empty-actions">
-        <button class="btn btn-primary" id="emptyReset">Clear filters</button>
-        <a class="btn btn-ghost" href="emergency.html">Post an emergency request</a>
+        <button class="btn btn-primary" id="emptyReset">সব ফিল্টার মুছুন</button>
+        <a class="btn btn-ghost" href="emergency.html">জরুরি অনুরোধ করুন</a>
       </div>
     </div>`;
     host.querySelector('#emptyReset')?.addEventListener('click', () => document.getElementById('btnReset')?.click());
@@ -219,15 +230,14 @@ function card(d) {
   const dist = state.distances.get(d.id);
   const eligible = nextEligibleDate(d);
   const eligibleFuture = eligible && new Date(eligible) > new Date();
-  const available = d.available !== false;
-  const meta = GROUP_META[g] || { note: '' };
+  const available = d.available !== false && !eligibleFuture;
   const place = [d.area, d.district].filter(Boolean).join(', ') || 'Bangladesh';
 
   return `<article class="donor-card ${available ? '' : 'is-busy'}" style="--hue:${(GROUP_META[g] || {}).hue || 355}" data-id="${d.id}" data-reveal>
     <div class="dc-top">
       ${avatar(d.name, g)}
       <div class="dc-id">
-        <h3 class="dc-name">${_e(d.name)}${d.status === 'verified' ? `<span class="tick" title="Verified by the team">${icon('check')}</span>` : ''}</h3>
+        <h3 class="dc-name">${_e(d.name)}${d.status === 'verified' ? `<span class="tick" aria-hidden="true">${icon('check')}</span>` : ''}</h3>
         <p class="dc-place">${icon('pin')}<span>${_e(place)}</span></p>
       </div>
       ${bloodBadge(g, 'lg')}
@@ -235,9 +245,9 @@ function card(d) {
 
     <div class="dc-tags">
       ${d.status === 'verified'
-        ? '<span class="tag tag-verified">Verified by the team</span>'
-        : '<span class="tag tag-self">Self-reported · not verified yet</span>'}
-      <span class="tag ${available ? 'tag-ok' : 'tag-off'}">${available ? 'Available now' : `Busy — back ${formatDate(eligible)}`}</span>
+        ? '<span class="tag tag-verified">Reviewed by the team</span>'
+        : '<span class="tag tag-self">Self-reported · awaiting review</span>'}
+      <span class="tag ${available ? 'tag-ok' : 'tag-off'}">${available ? 'Available now (self-reported)' : d.available === false ? 'Marked unavailable' : `Display filter until ${eligible.slice(0,10)}`}</span>
       ${dist != null ? `<span class="tag tag-dist" title="Approximate distance">${icon('pin')}${distanceLabel(dist)}</span>` : ''}
       ${d.donations ? `<span class="tag">${d.donations} donation${d.donations > 1 ? 's' : ''}</span>` : ''}
       ${d.age ? `<span class="tag">Age ${d.age}</span>` : ''}
@@ -245,7 +255,7 @@ function card(d) {
 
     ${d.note ? `<p class="dc-note">${_e(d.note)}</p>` : ''}
 
-    <p class="dc-fact muted small">${_e(meta.note)} · Listed ${timeAgo(d.createdAt)}</p>
+    <p class="dc-fact muted small">Listed ${_e(timeAgo(d.createdAt) || '—')}</p>
 
     <div class="dc-actions">
       <button class="btn btn-primary btn-sm" data-act="reveal">${icon('phone')}<span>Show contact</span></button>
@@ -285,18 +295,19 @@ function donorInfo(d) {
   const g = String(d.bloodGroup).toUpperCase();
   const eligible = nextEligibleDate(d);
   dialog({
-    title: d.name,
+    title: d.name, translateTitle: false,
     body: `<div class="info-grid">
       <div>${bloodBadge(g, 'lg')}</div>
       <dl>
-        <dt>Blood group</dt><dd>${g} — ${(GROUP_META[g] || {}).label || ''}</dd>
-        <dt>Location</dt><dd>${_e([d.area, d.district].filter(Boolean).join(', '))}</dd>
-        <dt>Status</dt><dd>${d.available !== false ? 'Available now' : `Cooling-off until ${formatDate(eligible)}`}</dd>
+        <dt>Blood group</dt><dd>${_e(g)}</dd>
+        <dt>Location</dt><dd data-no-translate>${_e([d.area, d.district].filter(Boolean).join(', '))}</dd>
+        <dt>Availability (self-reported)</dt><dd>${d.available !== false ? 'Marked available' : 'Marked unavailable'}</dd>
+        <dt>Display filter until</dt><dd>${eligible ? _e(eligible.slice(0,10)) : 'No date recorded'}</dd>
         <dt>Last donation</dt><dd>${d.lastDonation ? formatDate(d.lastDonation) : 'Not recorded'}</dd>
         <dt>Total donations</dt><dd>${d.donations || 0}</dd>
         <dt>Listed</dt><dd>${timeAgo(d.createdAt)}</dd>
       </dl>
-      <p class="muted small">Phone numbers stay hidden until you tap “Show contact”, and every reveal is rate-limited to protect donors from spam.</p>
+      <p class="muted small">This information is self-reported. Review does not determine medical eligibility. Confirm availability and donation requirements with the donor and blood bank.</p>
     </div>`,
     confirmText: 'Close', hideCancel: true
   });

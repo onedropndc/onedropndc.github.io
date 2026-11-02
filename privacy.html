@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -30,7 +30,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=2.1.0">
 
 </head>
 <body>
@@ -39,7 +39,8 @@
       <div class="wrap">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a> <span>/</span> <span>Privacy &amp; terms</span></nav>
         <h1>Privacy policy, terms and contact</h1>
-        <p>Plain language, no legal fog. Last updated: September 2026.</p>
+        <nav class="jump-links" aria-label="Privacy topics"><a href="#main">Privacy policy</a><a href="#terms">Terms of use</a><a href="#contact">Contact the team</a></nav>
+        <p>Please review how your information is used. Last updated: 2 November 2026.</p>
       </div>
     </section>
 
@@ -47,64 +48,47 @@
       <div class="wrap form-layout">
         <div class="prose">
           <h2 style="margin-top:0">1. What we store</h2>
-          <p>When you register as a donor we store: your name, mobile number, blood group, district, optional area,
-          optional age and note, optional last-donation date, and — only if you tap “Use my current location” — your
-          GPS coordinates. When you post an emergency request we store the patient’s name, blood group, units,
-          hospital, district, attendant name and number, deadline and note.</p>
-          <p>We do <strong>not</strong> store passwords, email addresses, medical records, national ID numbers, IP logs
-          or advertising identifiers. There are no third-party analytics or ad networks on this site.</p>
+          <p>Donor profiles include your name, phone, blood group, district, availability and any optional details you provide, including GPS if you choose to share it. New emergency requests include blood group, units, hospital, district, contact number and needed-by time. Older records may contain additional details.</p>
+          <p>Contact forms may collect the email address or phone number you provide. Staff authentication uses email and password. Please avoid sharing medical records or identity numbers in free-text fields.</p>
 
           <h2>2. What is public</h2>
           <p>Visible to any visitor: your name, blood group, district/area, availability status, donation count, age and note.
-          <strong>Your mobile number is never rendered in the page until a visitor explicitly taps “Show contact”</strong>,
-          and that action is limited to 25 reveals per browser per hour to discourage scraping.</p>
+          <strong>Your mobile number, optional GPS coordinates and other donor record fields are accessible in the public directory data.</strong> The interface masks the number until a visitor taps “Show contact”, but this is not a security control. The per-browser limit can be bypassed.</p>
+          <p>Emergency request data, including the contact number, may also be publicly accessible while a request is awaiting review. Do not submit someone else’s information without permission.</p>
           <div class="callout">
-            <p>If you do not want your name searchable by search engines, use a first name plus initial when registering,
-            and keep the note field free of personal details.</p>
+            <p>Only submit information you are comfortable sharing publicly. Avoid medical records, identity numbers and other sensitive details in free-text fields.</p>
           </div>
 
           <h2>3. Your location</h2>
-          <p>Location is optional and used only to sort donors by distance. Even when shared, the public interface shows
-          only an approximate distance in kilometres, never the coordinates. Without GPS we fall back to the centre of
-          your district, which is a rough estimate.</p>
+          <p>Precise location is optional. The interface may show approximate distance, but shared GPS coordinates are accessible in directory data. Without GPS, the district centre is used as a rough estimate.</p>
 
           <h2>4. How to change or delete your data</h2>
-          <p>Open <a href="my-donor.html">My donor profile</a> on the device you registered from. You can edit every field,
-          pause your listing, log a donation, or delete the listing permanently. Deletion takes effect immediately.
-          If you have lost access to that device, contact us and a moderator will remove it manually.</p>
+          <p><a href="my-donor.html">My donor profile</a>: open it in the browser used to register. When connected, you can edit, mark yourself unavailable or remove the listing. Marking yourself unavailable does not make your record private. If you lose access, contact the team; recovery is not guaranteed.</p>
 
           <h2>5. Security</h2>
-          <p>Data is stored in Google Cloud Firestore with security rules that allow anyone to read the directory but only
-          the owner of a record to update or delete it. Records are created through an anonymous Firebase session, so an
-          attacker cannot silently edit someone else’s listing. The full rule set is published in the repository and can
-          be copied from the moderator dashboard.</p>
+          <p>Data is stored in Google Cloud Firestore. Directory data is public; updates and deletion depend on authentication and the security rules actually deployed. The proposed rules are in the repository and must be reviewed and tested before publishing.</p>
 
           <h2>6. Moderation</h2>
-          <p>Volunteer moderators from Batch 27 may verify, suspend or delete listings and emergency requests that
-          are false, commercial, duplicate or abusive. Paid blood dealing is illegal in Bangladesh; any such listing is
-          removed without notice.</p>
+          <p>Volunteer moderators may review and remove misleading, duplicate, commercial or abusive listings and requests. Review does not guarantee that every detail has been independently verified.</p>
 
           <h2>7. Children</h2>
           <p>One Drop is intended for donors aged 18 and over. We do not knowingly collect data from anyone younger.</p>
 
           <h2 id="terms">8. Terms of use</h2>
           <ul>
-            <li>You confirm that the information you submit is true and that you are medically fit to donate.</li>
+            <li>Provide accurate information. The blood bank or clinician determines medical eligibility.</li>
             <li>Donation must always be voluntary and unpaid. Never ask for or accept payment.</li>
             <li>Do not post false, duplicate or commercial emergency requests.</li>
             <li>Do not use the directory for marketing, spam or harassment.</li>
-            <li>One Drop is provided “as is”. We are a student coordination tool, not a medical service, and we are not
-            liable for the outcome of any transfusion or for a donor’s failure to respond.</li>
+            <li>One Drop helps people connect; it is not a medical service. The clinician and blood bank make transfusion decisions.</li>
             <li>In a life-threatening emergency, call the hospital blood bank and emergency services first.</li>
           </ul>
 
           <h2>9. Changes to this policy</h2>
-          <p>If we change what we store, we will update this page and note the date at the top. Continued use after a change
-          means you accept the updated policy.</p>
+          <p>If this policy changes, this page and its update date will be revised.</p>
 
           <h2 id="contact">10. Contact the team</h2>
-          <p>Found a wrong listing, a fake request, or have a suggestion? Write to us — moderators check this inbox from
-          the admin panel.</p>
+          <p>Found incorrect information or have a suggestion? Send the team a message. Please do not include sensitive medical or identity details.</p>
 
           <form id="contactForm" class="form-card" style="margin-top:1rem" novalidate>
             <div class="form-grid">
@@ -139,9 +123,9 @@
           <div class="panel">
             <h3 style="margin-bottom:.6rem">Data at a glance</h3>
             <ul class="muted small" style="display:grid;gap:.5rem;padding-left:0;list-style:none">
-              <li>🟢 <strong>Public:</strong> name, blood group, district, availability</li>
-              <li>🟡 <strong>On request:</strong> mobile number (rate-limited)</li>
-              <li>🔴 <strong>Never shared:</strong> coordinates, session identifiers</li>
+              <li>Donor details, phone and optional GPS coordinates are publicly accessible.</li>
+              <li>Request details may be accessible even before approval.</li>
+              <li>UI masking does not make public records private.</li>
             </ul>
           </div>
           <div class="panel" style="margin-top:1rem">
@@ -168,10 +152,14 @@
       }
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true; btn.classList.add('is-loading'); btn.textContent = 'Sending…';
-      await sendMessage(data);
+      try { await sendMessage(data); } catch {
+        btn.disabled = false; btn.classList.remove('is-loading'); btn.textContent = 'Send message';
+        toast('Message not sent. Check your connection and try again.', 'error', 10000);
+        return;
+      }
       btn.disabled = false; btn.classList.remove('is-loading'); btn.textContent = 'Send message';
       form.reset();
-      toast('Message sent. A moderator will get back to you.', 'success');
+      toast('Message sent. The team can review it.', 'success');
     });
   </script>
 </body>

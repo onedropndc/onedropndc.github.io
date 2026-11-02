@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Donor Card Generator — One Drop</title>
+  <meta name="description" content="Create a personal One Drop donor card in your browser and download it as a PNG image.">
+  <meta name="theme-color" content="#C8102E">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="assets/css/main.css?v=2.1.0">
+</head>
+<body>
+<main id="main">
+  <section class="page-hero card-page-hero"><div class="wrap">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a> <span>/</span> <span>Donor card</span></nav>
+    <span class="card-page-kicker">MADE FOR DONORS</span>
+    <h1>Create your donor card</h1>
+    <p>Enter your details, review the preview and download a shareable PNG. Creating a card does not register you as a donor.</p>
+  </div></section>
+  <section class="section card-builder-section"><div class="wrap card-builder">
+    <div class="form-card card-editor">
+      <div class="card-editor-head"><div><span class="card-page-kicker">STEP 01</span><h2>Your details</h2><p>Only name, blood group and district are required.</p></div><span class="card-editor-symbol" aria-hidden="true">✦</span></div>
+      <button class="btn btn-ghost btn-sm card-import" id="importDonor" type="button">Use my profile details</button>
+      <p id="importStatus" class="card-import-status" role="status">Optional: load a profile saved on this device, or enter details manually. Importing replaces the current fields.</p>
+      <form id="donorCardForm" novalidate>
+        <div class="card-form-fields">
+          <div class="field card-field-full"><label for="card-name">Full name *</label><input id="card-name" name="name" class="input" type="text" maxlength="60" autocomplete="name" required placeholder="Enter your name"></div>
+          <div class="field"><label for="card-group">Blood group *</label><select id="card-group" name="bloodGroup" class="input" required></select></div>
+          <div class="field"><label for="card-district">District *</label><select id="card-district" name="district" class="input" required></select></div>
+          <div class="field card-field-full"><label for="card-area">Area / thana <span class="muted">(optional)</span></label><input id="card-area" name="area" class="input" maxlength="65" autocomplete="address-level2" placeholder="e.g. Mirpur"></div>
+          <div class="field card-field-full"><label for="card-phone">Mobile number <span class="muted">(optional)</span></label><input id="card-phone" name="phone" class="input" type="tel" inputmode="tel" autocomplete="tel" placeholder="01712345678"><span class="hint">Your number stays off the image unless you choose to include it.</span></div>
+          <div class="field card-field-full"><label class="card-consent"><input type="checkbox" name="includePhone" id="includePhone"><span>Include my mobile number on the card</span></label></div>
+        </div>
+        <div class="card-privacy"><strong>Before you share</strong><p>Anyone who receives the image can see everything on it. The card is created on this device; it is not an official ID or proof of verification.</p></div>
+        <p class="card-form-status" id="cardFormStatus" role="status" aria-live="polite">Complete the required details to download.</p>
+        <button class="btn btn-primary card-download" id="downloadDonorCard" type="submit" disabled>Download donor card (PNG) <span aria-hidden="true">↓</span></button>
+      </form>
+    </div>
+    <div class="card-preview-column">
+      <div class="card-preview-heading"><div><span class="card-page-kicker">STEP 02</span><h2>Live preview</h2><p>Check your details before downloading.</p></div><span class="card-preview-tag">PNG · 1080 × 1350</span></div>
+      <div class="card-preview-surface"><canvas id="donorCardCanvas" width="1080" height="1350" role="img" aria-label="Donor card preview"></canvas></div>
+      <p id="donorCardSummary" class="card-a11y" data-no-translate aria-live="polite"></p>
+      <p id="donorCardWarning" class="card-warning" hidden>Some long details were shortened. Check the image before sharing.</p>
+      <div class="card-preview-note"><span aria-hidden="true">✦</span><p>Made locally in your browser. Your card is not uploaded or saved by this tool.</p></div>
+    </div>
+  </div></section>
+</main>
+<script type="module">
+  import { bootUI } from './assets/js/app.js';
+  import { initDonorCard } from './assets/js/donor-card.js';
+  bootUI('donor-card'); initDonorCard();
+</script>
+</body>
+</html>

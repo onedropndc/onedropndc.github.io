@@ -1,7 +1,7 @@
 /* Register / edit donor profile — validation, geolocation, share card */
 
 import { BLOOD_GROUPS, isValidPhone, normalizePhone, isPlausibleDate } from './blood.js';
-import { addDonor, updateDonor, listDonors, isLive, nextEligibleDate } from './data.js';
+import { addDonor, updateDonor, deleteDonor, listDonors, isLive, nextEligibleDate } from './data.js';
 
 /* Lost-phone recovery: a saved code + the registered number re-links the
    profile on a new device. No OTP, no account, no extra signup steps. */
@@ -41,6 +41,7 @@ function wireLiveValidation(form) {
     f.addEventListener('input', () => { if (f.dataset.touched === '1') validate(f); updateProgress(form); });
     f.addEventListener('change', () => { f.dataset.touched = '1'; validate(f); updateProgress(form); });
   });
+  form.elements.consent.addEventListener('change', () => updateProgress(form));
   updateProgress(form);
 }
 
@@ -54,7 +55,7 @@ function validate(field) {
   else if (val && rules.date && !isPlausibleDate(val)) msg = 'Pick a realistic date (not in the future)';
   else if (val && rules.age) {
     const n = Number(val);
-    if (!Number.isFinite(n) || n < 18 || n > 65) msg = 'Donors must be between 18 and 65 years old';
+    if (!Number.isFinite(n) || n < 18 || n > 65) msg = 'Enter an age from 18 to 65 for this optional field.';
   }
   setError(field, msg);
   field.dataset.touched = '1';
@@ -77,9 +78,9 @@ function setError(field, msg) {
 function updateProgress(form) {
   const bar = document.getElementById('formProgress');
   if (!bar) return;
-  const fields = Array.from(form.querySelectorAll('[data-rules]'));
-  const done = fields.filter((f) => String(f.value || '').trim().length > 0 && !f.closest('.field')?.classList.contains('is-invalid')).length;
-  const pct = Math.round((done / Math.max(1, fields.length)) * 100);
+  const fields = Array.from(form.querySelectorAll('[data-rules][required]'));
+  const done = fields.filter((f) => String(f.value || '').trim().length > 0 && !f.closest('.field')?.classList.contains('is-invalid')).length + (form.elements.consent.checked ? 1 : 0);
+  const pct = Math.round((done / (fields.length + 1)) * 100);
   bar.style.setProperty('--p', `${pct}%`);
   const label = document.getElementById('formProgressLabel');
   if (label) label.textContent = pct === 100 ? 'All set — submit when ready' : `${pct}% complete`;
@@ -111,7 +112,7 @@ function wireLocation(form) {
     state.lat = Number(res.lat.toFixed(5));
     state.lng = Number(res.lng.toFixed(5));
     state.locationSource = 'gps';
-    out.innerHTML = `<span class="loc-ok">${icon('check')} Precise location saved (±${Math.round(res.accuracy || 0)} m). Only your approximate distance is ever shown publicly.</span>`;
+    out.innerHTML = `<span class="loc-ok">${icon('check')} Precise location saved (±${Math.round(res.accuracy || 0)} m). Coordinates are accessible with your public record.</span>`;
   });
 }
 
@@ -136,19 +137,18 @@ async function hydrateExisting(form) {
   form.elements.note.value = mine.note || '';
   form.elements.donations.value = mine.donations || 0;
   form.elements.consent.checked = true;
+  if (mine.age || mine.note || mine.donations || mine.lat != null) document.getElementById('optionalDetails').open = true;
 
   document.getElementById('formTitle').textContent = 'Update your donor profile';
-  document.getElementById('formIntro').textContent = 'This is the profile you already published. Change anything and save — updates appear instantly for everyone.';
+  document.getElementById('formIntro').textContent = 'You can update the information in your profile. Changes need a successful connection to save.';
   const submit = form.querySelector('[type="submit"]');
   submit.innerHTML = `${icon('check')} Save changes`;
   document.getElementById('profileStatus')?.classList.remove('hidden');
   const st = document.getElementById('profileStatus');
   if (st) {
-    const next = nextEligibleDate(mine);
     st.innerHTML = `${icon('shield')}<div>
-      <strong>Your listing is live</strong>
-      <span>Status: ${mine.status === 'verified' ? 'verified by the team' : 'pending review'} · 
-      ${mine.available !== false ? 'marked available' : `cooling-off until ${next ? next.slice(0, 10) : '—'}`}</span>
+      <strong>Your donor profile</strong>
+      <span><span>Status</span>: <span>${mine.status === 'verified' ? 'Reviewed by the team' : 'Awaiting review'}</span> · <span>${mine.available !== false ? 'Marked available' : 'Marked unavailable'}</span></span>
     </div>
     <button class="link-btn" id="btnCopyMyLink">Copy my donor link</button>`;
     st.querySelector('#btnCopyMyLink')?.addEventListener('click', async () => {
@@ -167,7 +167,9 @@ async function submit(form) {
   if (!form.elements.consent.checked) { toast('Please accept the consent statement to continue.', 'error'); ok = false; }
   if (!ok) {
     toast('Please fix the highlighted fields.', 'error');
-    form.querySelector('.is-invalid input, .is-invalid select, .is-invalid textarea')?.focus();
+    const first = form.querySelector('.is-invalid input, .is-invalid select, .is-invalid textarea');
+    const details = first?.closest('details'); if (details) details.open = true;
+    first?.focus();
     return;
   }
 
@@ -190,11 +192,20 @@ async function submit(form) {
   };
 
   let recoveryCode = null;
-  if (!state.editingId) { recoveryCode = makeRecoveryCode(); data.recoveryHash = hashRecovery(recoveryCode); }
+  // Cross-device recovery requires verified authentication; do not promise it yet.
 
+  const isNew = !state.editingId;
   let saved;
-  if (state.editingId) saved = { id: state.editingId, ...(await updateDonor(state.editingId, data), data) };
-  else saved = await addDonor(data);
+  try {
+    if (state.editingId) {
+      if (!(await updateDonor(state.editingId, data))) throw new Error('Update failed');
+      saved = { id: state.editingId, ...data };
+    } else saved = await addDonor(data);
+  } catch (err) {
+    btn.disabled = false; btn.classList.remove('is-loading'); btn.innerHTML = original;
+    toast('প্রোফাইল সংরক্ষণ হয়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।', 'error', 10000);
+    return;
+  }
 
   if (!state.editingId) {
     state.editingId = saved.id;
@@ -205,24 +216,24 @@ async function submit(form) {
   }
 
   btn.disabled = false; btn.classList.remove('is-loading'); btn.innerHTML = original;
-  showSuccess(saved, recoveryCode);
+  showSuccess(saved, recoveryCode, isNew);
 }
 
-function showSuccess(d, code) {
+function showSuccess(d, code, isNew) {
   const panel = document.getElementById('successPanel');
   if (!panel) { toast('Saved successfully.', 'success'); return; }
   panel.hidden = false;
   panel.innerHTML = `
     <div class="success-inner">
       <div class="success-mark">${icon('check')}</div>
-      <h2>${state.editingId ? 'Profile updated' : 'You are on the list'}</h2>
-      <p>Thank you, <strong>${_e(d.name)}</strong>. Your ${_e(d.bloodGroup)} profile is now visible to everyone searching the directory.</p>
+      <h2>${isNew ? 'Profile submitted for review' : 'Profile updated'}</h2>
+      <p>Thank you, <strong data-no-translate>${_e(d.name)}</strong>. Your profile has been saved. Contact details are publicly accessible.</p>
       <div class="success-card">
         ${avatar(d.name, d.bloodGroup)}
         <div>
-          <strong>${_e(d.name)}</strong>
-          <span>${_e(d.bloodGroup)} · ${_e([d.area, d.district].filter(Boolean).join(', '))}</span>
-          <span class="muted small">Contact number stays hidden until a requester taps “Show contact”.</span>
+          <strong data-no-translate>${_e(d.name)}</strong>
+          <span data-no-translate>${_e(d.bloodGroup)} · ${_e([d.area, d.district].filter(Boolean).join(', '))}</span>
+          <span class="muted small">Your contact number is accessible to people looking for donors.</span>
         </div>
         ${bloodBadge(d.bloodGroup, 'lg')}
       </div>
@@ -240,10 +251,11 @@ function showSuccess(d, code) {
       <div class="success-actions">
         <button class="btn btn-primary" id="btnShareProfile">${icon('share')} Share my profile</button>
         <a class="btn btn-ghost" href="my-donor.html">${icon('user')} Edit my profile anytime</a>
+        <a class="btn btn-ghost" href="donor-card.html">${icon('download')} Create donor card</a>
         <a class="btn btn-ghost" href="donors.html?group=${encodeURIComponent(d.bloodGroup)}">See the directory</a>
       </div>
       ${communityCard('success')}
-      <p class="muted small" style="margin-top:1rem">${isLive() ? 'Saved to the shared cloud database.' : 'Saved on this device (offline mode) — it will sync when Firebase is reachable.'}</p>
+      <p class="muted small" style="margin-top:1rem">Saved to the shared cloud database.</p>
     </div>`;
   wireCommunity(panel);
   panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -272,11 +284,11 @@ export async function initMyDonor() {
     host.innerHTML = `<div class="empty">
       <div class="empty-mark">${icon('user')}</div>
       <h3>No donor profile on this device</h3>
-      <p>Profiles are tied to the browser you registered from. Register here — or, if this is a new phone, recover your
-      existing profile with your recovery code.</p>
+      <p>Profiles are tied to the browser you registered from. If you have lost access to that device, contact the team for help.</p>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center">
         <a class="btn btn-primary" href="register.html">Register as a donor</a>
-        <button class="btn btn-ghost" id="btnRecover" type="button">Recover my profile</button>
+        <a class="btn btn-ghost" href="privacy.html#contact">Contact the team</a>
+        <a class="btn btn-ghost" href="donor-card.html">Create donor card</a>
       </div>
     </div>`;
     wireRecovery();
@@ -289,21 +301,20 @@ export async function initMyDonor() {
       <div class="my-head">
         ${avatar(mine.name, mine.bloodGroup)}
         <div>
-          <h2>${_e(mine.name)}</h2>
-          <p class="muted">${_e([mine.area, mine.district].filter(Boolean).join(', '))} · listed ${mine.status === 'verified' ? 'and verified' : '(pending review)'}</p>
+          <h2 data-no-translate>${_e(mine.name)}</h2>
+          <p class="muted"><span data-no-translate>${_e([mine.area, mine.district].filter(Boolean).join(', '))}</span> · <span>${mine.status === 'verified' ? 'Reviewed by the team' : 'Awaiting review'}</span></p>
         </div>
         ${bloodBadge(mine.bloodGroup, 'lg')}
       </div>
       <ul class="my-facts">
-        <li><span>Status</span><strong>${mine.available !== false ? 'Available now' : 'Cooling-off'}</strong></li>
-        <li><span>Next eligible</span><strong>${next ? next.slice(0, 10) : 'Anytime'}</strong></li>
+        <li><span>Availability (self-reported)</span><strong>${mine.available !== false ? 'Marked available' : 'Marked unavailable'}</strong></li>
+        <li><span>Display filter until</span><strong>${next ? next.slice(0, 10) : 'No date recorded'}</strong></li>
         <li><span>Donations logged</span><strong>${mine.donations || 0}</strong></li>
-        <li><span>Cooling-off rule</span><strong>${DONATION_COOLDOWN_DAYS} days</strong></li>
+        <li><span>Display filter</span><strong>${DONATION_COOLDOWN_DAYS} days</strong></li>
       </ul>
-      ${localStorage.getItem(LS.RECOVERY) ? `<p class="muted small" style="margin:.2rem 0 0">Recovery code on this device:
-        <strong style="letter-spacing:.06em">${_e(localStorage.getItem(LS.RECOVERY))}</strong> — keep it saved somewhere else too.</p>` : ''}
       <div class="my-actions">
         <a class="btn btn-primary" href="register.html">${icon('edit')} Edit profile</a>
+        <a class="btn btn-ghost" href="donor-card.html">${icon('download')} Create donor card</a>
         <button class="btn btn-ghost" id="btnToggleAvail">${mine.available !== false ? 'Mark as busy' : 'Mark as available'}</button>
         <button class="btn btn-ghost" id="btnLogDonation">${icon('drop')} I donated today</button>
         <button class="btn btn-ghost danger" id="btnRemoveProfile">${icon('trash')} Remove my listing</button>
@@ -359,20 +370,20 @@ export async function initMyDonor() {
   }
 
   host.querySelector('#btnToggleAvail').addEventListener('click', async () => {
-    await updateDonor(mine.id, { available: !(mine.available !== false) });
+    if (!(await updateDonor(mine.id, { available: !(mine.available !== false) }))) { toast('Update failed. Please check your connection.', 'error'); return; }
     toast('Availability updated.', 'success'); setTimeout(() => location.reload(), 600);
   });
   host.querySelector('#btnLogDonation').addEventListener('click', async () => {
-    const ok = await dialog({ title: 'Log a donation', body: `<p>This sets your last donation to <strong>today</strong> and pauses your listing for ${DONATION_COOLDOWN_DAYS} days so you are not asked again too soon.</p>`, confirmText: 'Log donation' });
+    const ok = await dialog({ title: 'Log a donation', body: `<p>This records today and marks your profile unavailable. The ${DONATION_COOLDOWN_DAYS}-day display filter is not a medical eligibility decision; ask the blood bank. You can update your availability later.</p>`, confirmText: 'Log donation' });
     if (!ok) return;
-    await updateDonor(mine.id, { lastDonation: new Date().toISOString(), available: false, donations: (mine.donations || 0) + 1 });
+    if (!(await updateDonor(mine.id, { lastDonation: new Date().toISOString(), available: false, donations: (mine.donations || 0) + 1 }))) { toast('Update failed. Please check your connection.', 'error'); return; }
     toast('Thank you for donating. Rest well.', 'success');
     setTimeout(() => location.reload(), 700);
   });
   host.querySelector('#btnRemoveProfile').addEventListener('click', async () => {
     const ok = await dialog({ title: 'Remove your listing?', body: `<p>Your donor profile will be deleted from the directory permanently.</p>`, confirmText: 'Delete my profile', variant: 'danger' });
     if (!ok) return;
-    await updateDonor(mine.id, { status: 'suspended' });
+    if (!(await deleteDonor(mine.id))) { toast('Deletion failed. Please check your connection.', 'error'); return; }
     localStorage.removeItem(LS.MY_DONOR);
     toast('Listing removed.', 'success');
     setTimeout(() => { location.href = 'index.html'; }, 800);

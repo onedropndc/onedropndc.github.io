@@ -5,11 +5,12 @@
   "description": "One Drop — a volunteer blood donor community. Idea & initiative: Notre Dame College Batch 27. Developed by Foysal Mahmud.",
   "scripts": {
     "start": "python3 -m http.server 8080 --bind 0.0.0.0",
-    "test": "node tests/e2e.js && node tests/admin.e2e.js && node tests/export.e2e.js",
+    "test": "node tests/phase1.e2e.js && node tests/i18n.e2e.js && node tests/request-flow.e2e.js && node tests/ux-filter.e2e.js && node tests/site-organize.e2e.js && node tests/group-cards.e2e.js && node tests/final-audit.e2e.js && node tests/admin-safe.e2e.js && python3 tests/link-audit.py && node tests/cards.e2e.js && node tests/hero-scene.e2e.js && node tests/content-review.e2e.js && node tests/natural-copy.e2e.js",
     "test:smoke": "node tests/e2e.js",
     "test:admin": "node tests/admin.e2e.js",
     "test:export": "node tests/export.e2e.js",
-    "icons": "python3 tools/make_icons.py"
+    "icons": "python3 tools/make_icons.py",
+    "test:legacy": "node tests/e2e.js && node tests/admin.e2e.js && node tests/export.e2e.js"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0"

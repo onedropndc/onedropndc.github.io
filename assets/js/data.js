@@ -70,24 +70,24 @@ export async function listDonors() {
     const out = await tx('listDonors', async () => {
       const q = fb.fs.query(fb.fs.collection(fb.db, COL.DONORS), fb.fs.orderBy('createdAt', 'desc'));
       const snap = await fb.fs.getDocs(q);
+      if (!snap.metadata?.fromCache) writeLS(LS.DONORS, snap.docs.map(docToObj));
       return snap.docs.map(docToObj);
     });
-    if (out.length) writeLS(LS.DONORS, out);
     return ovDonors.merge(out.length ? out : mergeSeed(out));
   } catch {
-    return ovDonors.merge(mergeSeed(readLS(LS.DONORS, [])));
+    return ovDonors.merge(mergeSeed(readLS(LS.DONORS, []).filter(d => !String(d.id || '').startsWith('demo_'))));
   }
 }
 
 export function subscribeDonors(cb) {
   initData().then(() => {
-    if (!fb.ok) { cb(ovDonors.merge(readLS(LS.DONORS, [])), 'local'); window.addEventListener('lifeline:local-change', () => cb(ovDonors.merge(readLS(LS.DONORS, [])), 'local')); return; }
+    if (!fb.ok) { cb(ovDonors.merge(readLS(LS.DONORS, []).filter(d => !String(d.id || '').startsWith('demo_'))), 'local'); window.addEventListener('lifeline:local-change', () => cb(ovDonors.merge(readLS(LS.DONORS, []).filter(d => !String(d.id || '').startsWith('demo_'))), 'local')); return; }
     const q = fb.fs.query(fb.fs.collection(fb.db, COL.DONORS), fb.fs.orderBy('createdAt', 'desc'));
     fb.fs.onSnapshot(q, (snap) => {
       const rows = snap.docs.map(docToObj);
-      if (rows.length) writeLS(LS.DONORS, rows);
-      cb(ovDonors.merge(rows.length ? rows : mergeSeed([])), 'live');
-    }, () => cb(ovDonors.merge(mergeSeed(readLS(LS.DONORS, []))), 'local'));
+      if (!snap.metadata?.fromCache) writeLS(LS.DONORS, rows);
+      cb(ovDonors.merge(rows.length ? rows : mergeSeed([])), snap.metadata?.fromCache ? 'local' : 'live');
+    }, () => cb(ovDonors.merge(mergeSeed(readLS(LS.DONORS, []).filter(d => !String(d.id || '').startsWith('demo_')))), 'local'));
   });
 }
 
@@ -135,11 +135,7 @@ export async function addDonor(raw) {
     bumpStat('donations_registered');
     return { id: ref, ...data };
   } catch {
-    const local = { id: rid('donor'), ...data };
-    const rows = readLS(LS.DONORS, []);
-    rows.unshift(local); writeLS(LS.DONORS, rows);
-    ovDonors.add(local); ping();
-    return local;
+    throw new Error('Donor profile was not saved to the server.');
   }
 }
 
@@ -149,24 +145,14 @@ export async function updateDonor(id, patch) {
   try {
     await tx('updateDonor', async () => fb.fs.updateDoc(fb.fs.doc(fb.db, COL.DONORS, id), { ...patch, updatedAt: serverTs() }));
     return true;
-  } catch {
-    ovDonors.patch(id, { ...patch, updatedAt: now() });
-    const rows = readLS(LS.DONORS, []);
-    const i = rows.findIndex((r) => r.id === id);
-    if (i > -1) { rows[i] = { ...rows[i], ...patch, updatedAt: now() }; writeLS(LS.DONORS, rows); }
-    ping();
-    return false;
-  }
+  } catch { return false; }
 }
 
 export async function deleteDonor(id) {
   await initData();
   await ensureAuth();
   try { await tx('deleteDonor', async () => fb.fs.deleteDoc(fb.fs.doc(fb.db, COL.DONORS, id))); return true; }
-  catch {
-    ovDonors.del(id);
-    writeLS(LS.DONORS, readLS(LS.DONORS, []).filter((r) => r.id !== id)); ping(); return false;
-  }
+  catch { return false; }
 }
 
 /* ===========================================================
@@ -182,7 +168,7 @@ export async function listRequests() {
     });
     if (out.length) writeLS(LS.REQUESTS, out);
     return ovRequests.merge(out);
-  } catch { return ovRequests.merge(readLS(LS.REQUESTS, [])); }
+  } catch { return ovRequests.merge(readLS(LS.REQUESTS, []).filter(r => !String(r.id || '').startsWith('demo_'))); }
 }
 
 /* Local overlay: writes that fell back to cache (server denied / offline)
@@ -210,13 +196,13 @@ const ovMessages = makeOverlay();
 
 export function subscribeRequests(cb) {
   initData().then(() => {
-    if (!fb.ok) { cb(ovRequests.merge(readLS(LS.REQUESTS, [])), 'local'); window.addEventListener('lifeline:local-change', () => cb(ovRequests.merge(readLS(LS.REQUESTS, [])), 'local')); return; }
+    if (!fb.ok) { cb(ovRequests.merge(readLS(LS.REQUESTS, []).filter(r => !String(r.id || '').startsWith('demo_'))), 'local'); window.addEventListener('lifeline:local-change', () => cb(ovRequests.merge(readLS(LS.REQUESTS, []).filter(r => !String(r.id || '').startsWith('demo_'))), 'local')); return; }
     const q = fb.fs.query(fb.fs.collection(fb.db, COL.REQUESTS), fb.fs.orderBy('createdAt', 'desc'));
     fb.fs.onSnapshot(q, (snap) => {
       const rows = snap.docs.map(docToObj);
-      writeLS(LS.REQUESTS, rows);
-      cb(ovRequests.merge(rows), 'live');
-    }, () => cb(ovRequests.merge(readLS(LS.REQUESTS, [])), 'local'));
+      if (!snap.metadata?.fromCache) writeLS(LS.REQUESTS, rows);
+      cb(ovRequests.merge(rows), snap.metadata?.fromCache ? 'local' : 'live');
+    }, () => cb(ovRequests.merge(readLS(LS.REQUESTS, []).filter(r => !String(r.id || '').startsWith('demo_'))), 'local'));
   });
 }
 
@@ -253,11 +239,7 @@ export async function addRequest(raw) {
     bumpStat('requests_posted');
     return { id: ref, ...data };
   } catch {
-    const local = { id: rid('req'), ...data };
-    const rows = readLS(LS.REQUESTS, []);
-    rows.unshift(local); writeLS(LS.REQUESTS, rows);
-    ovRequests.add(local); ping();
-    return local;
+    throw new Error('Request was not submitted to the server.');
   }
 }
 
@@ -265,26 +247,14 @@ export async function updateRequest(id, patch) {
   await initData();
   await ensureAuth(); // owner / moderator writes need a session
   try { await tx('updateRequest', async () => fb.fs.updateDoc(fb.fs.doc(fb.db, COL.REQUESTS, id), { ...patch, updatedAt: serverTs() })); return true; }
-  catch {
-    ovRequests.patch(id, { ...patch, updatedAt: now() });
-    const rows = readLS(LS.REQUESTS, []);
-    const i = rows.findIndex((r) => r.id === id);
-    if (i > -1) { rows[i] = { ...rows[i], ...patch, updatedAt: now() }; writeLS(LS.REQUESTS, rows); }
-    ping();
-    return false;
-  }
+  catch { return false; }
 }
 
 export async function deleteRequest(id) {
   await initData();
   await ensureAuth();
   try { await tx('deleteRequest', async () => fb.fs.deleteDoc(fb.fs.doc(fb.db, COL.REQUESTS, id))); return true; }
-  catch {
-    ovRequests.del(id);
-    writeLS(LS.REQUESTS, readLS(LS.REQUESTS, []).filter((r) => r.id !== id));
-    ping();
-    return false;
-  }
+  catch { return false; }
 }
 
 /* ===========================================================
@@ -327,20 +297,13 @@ export async function saveAnnouncement(doc) {
   try {
     if (doc.id) { await tx('saveAnnouncement', async () => fb.fs.updateDoc(fb.fs.doc(fb.db, COL.ANNOUNCE, doc.id), { ...data, updatedAt: serverTs() })); return doc.id; }
     return await tx('saveAnnouncement', async () => (await fb.fs.addDoc(fb.fs.collection(fb.db, COL.ANNOUNCE), { ...data, createdAt: serverTs() })).id);
-  } catch {
-    const rows = readLS(LS.ANNOUNCE, []);
-    const id = doc.id || rid('ann');
-    const i = rows.findIndex((r) => r.id === id);
-    const row = { id, ...data };
-    if (i > -1) rows[i] = row; else rows.unshift(row);
-    writeLS(LS.ANNOUNCE, rows); ping(); return id;
-  }
+  } catch { return false; }
 }
 
 export async function deleteAnnouncement(id) {
   await initData();
   try { await tx('deleteAnnouncement', async () => fb.fs.deleteDoc(fb.fs.doc(fb.db, COL.ANNOUNCE, id))); return true; }
-  catch { writeLS(LS.ANNOUNCE, readLS(LS.ANNOUNCE, []).filter((r) => r.id !== id)); ping(); return false; }
+  catch { return false; }
 }
 
 export async function sendMessage(doc) {
@@ -355,9 +318,7 @@ export async function sendMessage(doc) {
   try {
     return await tx('sendMessage', async () => (await fb.fs.addDoc(fb.fs.collection(fb.db, COL.MESSAGES), { ...data, createdAt: serverTs() })).id);
   } catch {
-    const rows = readLS('lifeline:cache:messages', []);
-    rows.unshift({ id: rid('msg'), ...data }); writeLS('lifeline:cache:messages', rows); ping();
-    return 'local';
+    throw new Error('Message was not sent to the server.');
   }
 }
 
@@ -376,14 +337,8 @@ export async function listMessages() {
 export async function markMessageRead(id) {
   await initData();
   await ensureAuth();
-  try { await tx('markMessageRead', async () => fb.fs.updateDoc(fb.fs.doc(fb.db, COL.MESSAGES, id), { read: true })); }
-  catch {
-    ovMessages.patch(id, { read: true });
-    const rows = readLS('lifeline:cache:messages', []);
-    const i = rows.findIndex((r) => r.id === id);
-    if (i > -1) { rows[i].read = true; writeLS('lifeline:cache:messages', rows); }
-    ping();
-  }
+  try { await tx('markMessageRead', async () => fb.fs.updateDoc(fb.fs.doc(fb.db, COL.MESSAGES, id), { read: true })); return true; }
+  catch { return false; }
 }
 
 /* Lightweight daily counters (best effort, low write volume) */

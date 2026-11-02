@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -30,7 +30,7 @@
   <meta name="apple-mobile-web-app-title" content="One Drop">
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="stylesheet" href="assets/css/main.css?v=1.9.0">
+  <link rel="stylesheet" href="assets/css/main.css?v=2.1.0">
 
   <script type="application/ld+json">
   {
@@ -47,63 +47,51 @@
     <section class="page-hero">
       <div class="wrap">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="index.html">Home</a> <span>/</span> <span>Find a donor</span></nav>
-        <h1>Find a donor</h1>
-        <p>Search by blood group, district and availability. Numbers stay masked until you tap “Show contact” — we ask that
-        you use them only for a genuine, verified requirement.</p>
+        <h1>রক্তদাতা খুঁজুন</h1>
+        <p>রক্তের গ্রুপ, জেলা ও এলাকা দিয়ে খুঁজুন। ডোনারের সঙ্গে যোগাযোগ করে তথ্য ও প্রাপ্যতা নিশ্চিত করুন।</p>
       </div>
     </section>
 
     <section class="section" style="padding-top:1.6rem">
       <div class="wrap">
 
-        <div class="toolbar" role="search" aria-label="Filter donors">
-          <div class="toolbar-row">
+        <div class="toolbar donor-filter" role="search" aria-label="Filter donors">
+          <div class="filter-heading">
+            <div><h2>Filter donors</h2></div>
+            <button class="filter-reset" id="btnReset" type="button">Clear filters</button>
+          </div>
+          <div class="filter-group">
+            <p class="filter-label" id="groupFilterLabel">Blood group</p>
+            <div class="chip-row blood-chips" role="group" aria-labelledby="groupFilterLabel">
+              <button type="button" class="chip is-active" data-group-chip="ALL" aria-pressed="true">All</button>
+              <button type="button" class="chip" data-group-chip="A+" aria-pressed="false">A+</button>
+              <button type="button" class="chip" data-group-chip="A-" aria-pressed="false">A−</button>
+              <button type="button" class="chip" data-group-chip="B+" aria-pressed="false">B+</button>
+              <button type="button" class="chip" data-group-chip="B-" aria-pressed="false">B−</button>
+              <button type="button" class="chip" data-group-chip="AB+" aria-pressed="false">AB+</button>
+              <button type="button" class="chip" data-group-chip="AB-" aria-pressed="false">AB−</button>
+              <button type="button" class="chip" data-group-chip="O+" aria-pressed="false">O+</button>
+              <button type="button" class="chip" data-group-chip="O-" aria-pressed="false">O−</button>
+            </div>
+          </div>
+          <div class="filter-selects">
+            <label class="filter-field" for="districtFilter"><span>District</span><select id="districtFilter" class="input"></select></label>
+            <label class="filter-field" for="sortBy"><span>Sort by</span><select id="sortBy" class="input">
+              <option value="recent">Newest first</option><option value="nearest">Nearest to me</option><option value="group">Blood group</option><option value="name">Name (A–Z)</option>
+            </select></label>
+          </div>
+          <details class="filter-more" id="moreFilters">
+            <summary>Search by name or area <span class="filter-optional">(optional)</span></summary>
             <div class="search-field">
               <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-              <input id="donorSearch" class="input" type="search" placeholder="Search name, area, hospital or note…" autocomplete="off" aria-label="Search donors">
+              <input id="donorSearch" class="input" type="search" placeholder="নাম বা এলাকা লিখুন (যেমন Mirpur)" autocomplete="off" aria-label="Search donors">
             </div>
-            <select id="districtFilter" class="input" style="flex:0 1 200px" aria-label="Filter by district"></select>
-            <select id="sortBy" class="input" style="flex:0 1 190px" aria-label="Sort donors">
-              <option value="recent">Newest first</option>
-              <option value="nearest">Nearest to me</option>
-              <option value="group">Blood group</option>
-              <option value="name">Name (A–Z)</option>
-            </select>
-            <button class="btn btn-ghost btn-sm" id="btnLocate">
-              <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M12 21s6.6-6.1 6.6-11A6.6 6.6 0 0 0 5.4 10c0 4.9 6.6 11 6.6 11Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-              Near me
-            </button>
-          </div>
-
-          <div class="toolbar-row">
-            <div class="chip-row" role="group" aria-label="Filter by blood group">
-              <button class="chip is-active" data-group-chip="ALL">All groups</button>
-              <button class="chip" data-group-chip="A+">A+</button>
-              <button class="chip" data-group-chip="A-">A−</button>
-              <button class="chip" data-group-chip="B+">B+</button>
-              <button class="chip" data-group-chip="B-">B−</button>
-              <button class="chip" data-group-chip="AB+">AB+</button>
-              <button class="chip" data-group-chip="AB-">AB−</button>
-              <button class="chip" data-group-chip="O+">O+</button>
-              <button class="chip" data-group-chip="O-">O−</button>
-            </div>
-          </div>
-
-          <div class="toolbar-row" style="justify-content:space-between">
-            <div class="toolbar-row" style="gap:1rem">
-              <label class="switch"><input type="checkbox" id="onlyAvailable" checked> Available now only</label>
-              <span id="resultCount" class="muted small" aria-live="polite">Loading…</span>
-            </div>
-            <button class="btn btn-ghost btn-xs" id="btnReset">Reset filters</button>
-          </div>
-
-          <div class="toolbar-row" style="gap:.5rem">
-            <span id="modePill"></span>
-            <span id="locateStatus" class="muted small"></span>
-          </div>
-
+            <p class="filter-help">Use the spelling the donor entered. Try leaving it blank if you find no results.</p>
+          </details>
+          <div class="filter-bottom"><label class="switch"><input type="checkbox" id="onlyAvailable" checked> শুধু প্রস্তুত রক্তদাতা</label><span id="modePill"></span><span id="locateStatus" class="muted small"></span></div>
           <div class="callout" id="compatBanner" hidden style="margin:0;padding:.7rem 1rem"></div>
         </div>
+        <div class="results-heading"><div><h2>Matching donors</h2><p id="resultCount" class="muted small" aria-live="polite">Loading…</p></div><a href="emergency.html#postForm">Need help finding a donor? →</a></div>
 
         <div class="donor-grid" id="donorGrid" aria-live="polite"></div>
 
@@ -114,7 +102,7 @@
         <p class="muted small" style="margin-top:1.6rem;max-width:70ch">
           Distances are approximate: they use the donor’s shared location when available, otherwise the centre of
           their district. Always confirm the requirement with the hospital blood bank before travelling.
-          <a href="register.html">Register as a donor</a> if you are not on this list yet.
+          <span>Not listed yet?</span> <a href="register.html">Register as a donor</a>.
         </p>
       </div>
     </section>

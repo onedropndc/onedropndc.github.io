@@ -1,9 +1,10 @@
 /* Home page controller + shared app wiring */
 
 import { bootUI as shellBoot, icon, toast, initReveal, escapeHtml, notify } from './ui.js';
-import { initData, subscribeDonors, subscribeAnnouncements, subscribeRequests, bumpStat } from './data.js';
+import { initData, subscribeDonors, subscribeAnnouncements, subscribeRequests, bumpStat, nextEligibleDate } from './data.js';
 import { renderStats, initCompatibilityWidget, initEligibilityWidget } from './stats.js';
 import { BLOOD_GROUPS } from './blood.js';
+import { DISTRICTS, DISTRICT_LABELS } from './geo.js';
 import { renderRequestFeed } from './emergency.js';
 import { LS } from './config.js';
 
@@ -12,15 +13,21 @@ export async function bootHome() {
   await initData();
 
   /* Stats + donor pool */
-  subscribeDonors((rows) => {
-    renderStats(document.getElementById('statsHost'), rows);
+  subscribeDonors((rows, dataMode) => {
+    const note = document.getElementById('dataNotice');
+    if (note) note.hidden = dataMode === 'live';
+    const unknown = dataMode !== 'live' && !rows.length;
+    const statsHost = document.getElementById('statsHost');
+    if (unknown) statsHost.innerHTML = '<div class="callout">Live donor data is unavailable. Statistics will appear when a connection is available.</div>';
+    else renderStats(statsHost, rows);
     initReveal(document.getElementById('statsHost'));
     const byGroup = {};
-    rows.forEach((d) => { if (d.available !== false && d.status !== 'suspended') byGroup[d.bloodGroup] = (byGroup[d.bloodGroup] || 0) + 1; });
+    rows.forEach((d) => { if (d.available !== false && d.status !== 'suspended' && (!nextEligibleDate(d) || new Date(nextEligibleDate(d)) <= new Date())) byGroup[d.bloodGroup] = (byGroup[d.bloodGroup] || 0) + 1; });
     const pool = document.getElementById('quickPool');
     if (pool) {
       pool.querySelectorAll('[data-pool]').forEach((el) => {
         el.textContent = byGroup[el.dataset.pool] || 0;
+        el.closest('.gt-count').hidden = unknown;
       });
     }
     const ticker = document.getElementById('groupTicker');
@@ -59,6 +66,8 @@ export async function bootHome() {
   /* Quick search on hero */
   const form = document.getElementById('quickSearch');
   if (form) {
+    const districts = form.querySelector('[name="district"]');
+    if (districts) districts.insertAdjacentHTML('beforeend', DISTRICTS.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(DISTRICT_LABELS[d] || d)}</option>`).join(''));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const q = document.getElementById('quickSearchInput')?.value.trim() || '';
@@ -66,6 +75,7 @@ export async function bootHome() {
       const p = new URLSearchParams();
       if (q) p.set('q', q);
       if (g && g !== 'ALL') p.set('group', g);
+      if (districts && districts.value !== 'ALL') p.set('district', districts.value);
       location.href = `donors.html${p.toString() ? `?${p}` : ''}`;
     });
   }

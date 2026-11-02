@@ -3,7 +3,7 @@
 import { APP, VAPID_KEY, FIREBASE_CONFIG, OWNER_EMAILS } from './config.js';
 import { initData, listDonors, listRequests, listMessages, markMessageRead, listAnnouncements,
          saveAnnouncement, deleteAnnouncement, updateDonor, deleteDonor, updateRequest, deleteRequest,
-         clearLocalData, seedDemo, getStatSnapshot, isLive, logAudit } from './data.js';
+         clearLocalData, getStatSnapshot, isLive, logAudit } from './data.js';
 import { bootUI, icon, toast, dialog, copyText, escapeHtml as _e, bloodBadge, avatar } from './ui.js';
 import { formatDate, formatDateTime, timeAgo, prettyPhone, BLOOD_GROUPS } from './blood.js';
 import { computeStats } from './stats.js';
@@ -67,6 +67,8 @@ export async function initAdmin() {
     loadAll().then(() => { renderOverview(); wireTabs(); });
   }
 
+  wireAnnouncements();
+
   // Firebase restores sessions asynchronously — wait for it, then require a
   // password-provider (moderator) session. Everyone else sees the login card.
   let user = await waitForAuth();
@@ -93,7 +95,6 @@ export async function initAdmin() {
       btn.disabled = false; btn.textContent = 'Sign in';
     }
   });
-  wireAnnouncements();
 }
 
 async function loadAll() {
@@ -149,32 +150,21 @@ async function renderOverview() {
         <button class="btn btn-primary btn-sm" id="btnExportDonorsTop">${icon('download')} Export donors (CSV)</button>
         <button class="btn btn-ghost btn-sm" id="btnExportRequestsTop">${icon('download')} Export requests (CSV)</button>
         <button class="btn btn-ghost btn-sm" id="btnRefresh">${icon('clock')} Refresh data</button>
-        <button class="btn btn-ghost btn-sm" id="btnCopyRules">${icon('shield')} Copy Firestore rules</button>
-        <button class="btn btn-ghost btn-sm" id="btnSeed">${icon('plus')} Load demo dataset</button>
         <button class="btn btn-ghost btn-sm danger" id="btnClearLocal">${icon('trash')} Clear local cache</button>
         ${VAPID_KEY ? '<button class="btn btn-ghost btn-sm" id="btnPush">' + icon('bell') + ' Subscribe to push</button>' : ''}
       </div>
-      <p class="muted small">CSV exports contain every donor field, phone numbers included — download them only on a trusted device. Firestore rules protect the database from anonymous writes to fields you do not want public to edit.</p>
+      <p class="muted small">CSV exports contain every donor field, phone numbers included — download them only on a trusted device. Review and test the proposed firestore.rules in staging before deployment; the active rules may be different.</p>
       <div class="admin-note">
-        <strong>Moderation checklist:</strong> verify a donor only after you have confirmed the number by a call or a photo of the donor's ID. Suspend rather than delete when a listing is simply wrong — it keeps the record for auditing.
+        <strong>Moderation checklist:</strong> Confirm donor details carefully before verification. Do not request identity-document photos through this site.
       </div>
     </div>`;
 
   if (ctx.role !== 'owner') {
-    document.getElementById('btnSeed').style.display = 'none';
     document.getElementById('btnClearLocal').style.display = 'none';
   }
   document.getElementById('btnExportDonorsTop').onclick = () => openExportDialog('donors');
   document.getElementById('btnExportRequestsTop').onclick = () => openExportDialog('requests');
   document.getElementById('btnRefresh').onclick = async () => { await loadAll(); renderOverview(); toast('Data refreshed.', 'success'); };
-  document.getElementById('btnCopyRules').onclick = async () => {
-    const ok = await copyText(FIRESTORE_RULES);
-    toast(ok ? 'Rules copied — paste them into the Firebase console.' : 'Copy failed.', ok ? 'success' : 'error');
-  };
-  document.getElementById('btnSeed').onclick = async () => {
-    const ok = await dialog({ title: 'Load demo dataset?', body: '<p>This writes 24 sample donors and 3 sample requests into this browser\'s local cache (useful for demos and screenshots).</p>', confirmText: 'Load demo data' });
-    if (ok) { clearLocalData(); seedDemo(); await loadAll(); renderOverview(); toast('Demo data loaded locally.', 'success'); }
-  };
   document.getElementById('btnClearLocal').onclick = async () => {
     const ok = await dialog({ title: 'Clear local cache?', body: '<p>Removes cached donors, requests and the demo flag from this browser. Cloud data is untouched.</p>', confirmText: 'Clear', variant: 'danger' });
     if (ok) { clearLocalData(); await loadAll(); renderOverview(); toast('Local cache cleared.', 'success'); }
@@ -232,8 +222,7 @@ function renderDonors() {
       <div class="admin-view-head">
         <div>
           <h2 class="admin-view-title">Donor directory</h2>
-          <p class="muted small">Verify a donor only after you have confirmed the number by a call or a photo of their ID.
-            Suspend rather than delete when a listing is simply wrong.</p>
+          <p class="muted small">Review donor details carefully before changing the status. Do not request identity-document photos through this site.</p>
         </div>
         <div class="admin-view-actions">
           <button class="btn btn-ghost btn-sm" id="btnDonorRefresh">${icon('clock')} Refresh</button>
@@ -324,10 +313,10 @@ function renderDonorTable() {
 
   host.innerHTML = `<div class="table-wrap"><table class="data-table">
     <thead><tr><th scope="col">Donor</th><th scope="col">Group</th><th scope="col">Location</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead>
-    <tbody>${rows.map((d) => `<tr data-row="${d.id}">
-      <td><div class="cell-user">${avatar(d.name, d.bloodGroup)}<div><strong>${_e(d.name || 'Unnamed')}</strong><span class="muted small">${timeAgo(d.createdAt)}${isDemoRow(d) ? ' · sample' : ''}</span></div></div></td>
+    <tbody>${rows.map((d) => `<tr data-row="${_e(d.id)}">
+      <td><div class="cell-user">${avatar(d.name, d.bloodGroup)}<div><strong data-no-translate>${_e(d.name || 'Unnamed')}</strong><span class="muted small">${timeAgo(d.createdAt)}${isDemoRow(d) ? ' · sample' : ''}</span></div></div></td>
       <td>${bloodBadge(d.bloodGroup, 'sm')}</td>
-      <td>${_e([d.area, d.district].filter(Boolean).join(', '))}</td>
+      <td data-no-translate>${_e([d.area, d.district].filter(Boolean).join(', '))}</td>
       <td class="mono">${_e(prettyPhone(d.phone))}</td>
       <td><span class="pill pill-${_e(d.status || 'pending')}">${_e(d.status || 'pending')}</span>${d.available === false ? ' <span class="pill pill-off">busy</span>' : ''}</td>
       <td class="cell-actions">
@@ -341,12 +330,12 @@ function renderDonorTable() {
   host.querySelectorAll('tr[data-row]').forEach((tr) => {
     const d = ctx.donors.find((x) => x.id === tr.dataset.row);
     if (!d) return;
-    tr.querySelector('[data-a="verify"]')?.addEventListener('click', async () => { await updateDonor(d.id, { status: d.status === 'verified' ? 'pending' : 'verified' }); await loadAll(); renderDonorTable(); toast('Status updated.', 'success'); });
+    tr.querySelector('[data-a="verify"]')?.addEventListener('click', async () => { if (!(await updateDonor(d.id, { status: d.status === 'verified' ? 'pending' : 'verified' }))) { toast('Update failed. Check access and connection.', 'error'); return; } await loadAll(); renderDonorTable(); toast('Status updated.', 'success'); });
     tr.querySelector('[data-a="edit"]')?.addEventListener('click', () => openEditDonor(d));
-    tr.querySelector('[data-a="toggle"]')?.addEventListener('click', async () => { await updateDonor(d.id, { available: !(d.available !== false) }); await loadAll(); renderDonorTable(); toast('Availability updated.', 'success'); });
+    tr.querySelector('[data-a="toggle"]')?.addEventListener('click', async () => { if (!(await updateDonor(d.id, { available: !(d.available !== false) }))) { toast('Update failed. Check access and connection.', 'error'); return; } await loadAll(); renderDonorTable(); toast('Availability updated.', 'success'); });
     tr.querySelector('[data-a="delete"]')?.addEventListener('click', async () => {
       const ok = await dialog({ title: `Delete ${d.name}?`, body: '<p>This removes the donor permanently.</p>', confirmText: 'Delete', variant: 'danger' });
-      if (ok) { await deleteDonor(d.id); await loadAll(); renderDonorTable(); toast('Deleted.', 'success'); }
+      if (ok) { if (!(await deleteDonor(d.id))) { toast('Deletion failed. Check access and connection.', 'error'); return; } await loadAll(); renderDonorTable(); toast('Deleted.', 'success'); }
     });
   });
 }
@@ -467,7 +456,9 @@ function openEditDonor(d) {
       wrap.querySelector('#editErr').textContent = 'Enter a valid name and a Bangladeshi mobile number.';
       return;
     }
-    await updateDonor(d.id, { name: v.name.trim(), phone, bloodGroup: v.bloodGroup, district: v.district.trim(), area: v.area.trim(), note: v.note.trim() });
+    if (!(await updateDonor(d.id, { name: v.name.trim(), phone, bloodGroup: v.bloodGroup, district: v.district.trim(), area: v.area.trim(), note: v.note.trim() }))) {
+      wrap.querySelector('#editErr').textContent = 'Update failed. Check access and connection.'; return;
+    }
     close();
     await loadAll(); renderDonors(); toast('Donor updated.', 'success');
   });
@@ -490,12 +481,12 @@ function renderRequests() {
     </div>
     <div class="table-wrap"><table class="data-table">
     <thead><tr><th scope="col">Patient / hospital</th><th scope="col">Group</th><th scope="col">Units</th><th scope="col">Needed by</th><th scope="col">State</th><th scope="col">Actions</th></tr></thead>
-    <tbody>${rows.map((r) => `<tr data-row="${r.id}">
-      <td><div class="cell-user"><div><strong>${_e(r.patient || 'Patient')}</strong><span class="muted small">${_e([r.hospital, r.district].filter(Boolean).join(' · '))}</span></div></div></td>
+    <tbody>${rows.map((r) => `<tr data-row="${_e(r.id)}">
+      <td><div class="cell-user"><div><strong data-no-translate>${_e(r.patient || 'Patient')}</strong><span class="muted small" data-no-translate>${_e([r.hospital, r.district].filter(Boolean).join(' · '))}</span></div></div></td>
       <td>${bloodBadge(r.bloodGroup, 'sm')}</td>
-      <td>${r.units || 1}</td>
+      <td>${_e(r.units || 1)}</td>
       <td>${r.neededBy ? formatDate(r.neededBy) : 'ASAP'}</td>
-      <td><span class="pill pill-${r.status === 'active' ? 'pending' : r.status}">${r.status}</span></td>
+      <td><span class="pill pill-${r.status === 'active' ? 'pending' : _e(r.status)}">${_e(r.status)}</span></td>
       <td class="cell-actions">
         ${r.status === 'pending'
           ? `<button class="btn btn-primary btn-xs" data-a="active">Approve</button>
@@ -517,8 +508,8 @@ function renderRequests() {
         if (a === 'delete') {
           const ok = await dialog({ title: 'Delete request?', body: '<p>This removes the request permanently.</p>', confirmText: 'Delete', variant: 'danger' });
           if (!ok) return;
-          await deleteRequest(r.id);
-        } else await updateRequest(r.id, { status: a });
+          if (!(await deleteRequest(r.id))) { toast('Deletion failed. Check access and connection.', 'error'); return; }
+        } else if (!(await updateRequest(r.id, { status: a }))) { toast('Update failed. Check access and connection.', 'error'); return; }
         await loadAll(); renderRequests(); toast('Updated.', 'success');
       };
     });
@@ -530,14 +521,14 @@ function renderMessages() {
   const host = document.getElementById('adminMessages');
   if (!ctx.messages.length) { host.innerHTML = '<p class="muted">No messages yet. Visitors can write from the Contact section of the Privacy page.</p>'; return; }
   host.innerHTML = ctx.messages.map((m) => `
-    <article class="msg-card ${m.read ? '' : 'is-unread'}" data-msg="${m.id}">
-      <header><strong>${_e(m.subject || 'Message')}</strong><span class="muted small">${formatDateTime(m.createdAt)}</span></header>
-      <p>${_e(m.message)}</p>
-      <footer><span>${_e(m.name)} · ${_e(m.contact)}</span>
+    <article class="msg-card ${m.read ? '' : 'is-unread'}" data-msg="${_e(m.id)}">
+      <header><strong data-no-translate>${_e(m.subject || 'Message')}</strong><span class="muted small">${formatDateTime(m.createdAt)}</span></header>
+      <p data-no-translate>${_e(m.message)}</p>
+      <footer><span data-no-translate>${_e(m.name)} · ${_e(m.contact)}</span>
       ${m.read ? '' : `<button class="link-btn" data-a="read">Mark read</button>`}</footer>
     </article>`).join('');
   host.querySelectorAll('[data-a="read"]').forEach((b) => {
-    b.onclick = async () => { await markMessageRead(b.closest('[data-msg]').dataset.msg); await loadAll(); renderMessages(); };
+    b.onclick = async () => { if (!(await markMessageRead(b.closest('[data-msg]').dataset.msg))) { toast('Update failed. Check access and connection.', 'error'); return; } await loadAll(); renderMessages(); };
   });
 }
 
@@ -546,9 +537,9 @@ function renderAnnouncements() {
   const list = document.getElementById('announceList');
   const rows = ctx.announcements.slice().sort((a, b) => Number(b.active !== false) - Number(a.active !== false));
   list.innerHTML = rows.length
-    ? rows.map((a) => `<div class="ann-row" data-ann="${a.id}">
+    ? rows.map((a) => `<div class="ann-row" data-ann="${_e(a.id)}">
         <span class="pill pill-${a.active === false ? 'off' : a.level === 'alert' ? 'cancelled' : 'pending'}">${_e(a.active === false ? 'hidden' : a.level)}</span>
-        <div><strong>${_e(a.title)}</strong><span class="muted small">${_e(a.body)}</span></div>
+        <div><strong data-no-translate>${_e(a.title)}</strong><span class="muted small" data-no-translate>${_e(a.body)}</span></div>
         <button class="btn btn-ghost btn-xs" data-a="toggle">${a.active === false ? 'Show' : 'Hide'}</button>
         ${ctx.role === 'owner' ? '<button class="btn btn-ghost btn-xs danger" data-a="delete">Delete</button>' : ''}
       </div>`).join('')
@@ -556,20 +547,21 @@ function renderAnnouncements() {
 
   list.querySelectorAll('[data-ann]').forEach((row) => {
     const a = ctx.announcements.find((x) => x.id === row.dataset.ann);
-    row.querySelector('[data-a="toggle"]').onclick = async () => { await saveAnnouncement({ ...a, active: !a.active }); await loadAll(); renderAnnouncements(); };
-    row.querySelector('[data-a="delete"]')?.addEventListener('click', async () => { await deleteAnnouncement(a.id); await loadAll(); renderAnnouncements(); });
+    row.querySelector('[data-a="toggle"]').onclick = async () => { if (!(await saveAnnouncement({ ...a, active: !a.active }))) { toast('Update failed. Check access and connection.', 'error'); return; } await loadAll(); renderAnnouncements(); };
+    row.querySelector('[data-a="delete"]')?.addEventListener('click', async () => { if (!(await deleteAnnouncement(a.id))) { toast('Deletion failed. Check access and connection.', 'error'); return; } await loadAll(); renderAnnouncements(); });
   });
 }
 
 function wireAnnouncements() {
   const form = document.getElementById('announceForm');
-  if (!form) return;
+  if (!form || form.dataset.wired === '1') return;
+  form.dataset.wired = '1';
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = form.elements.title.value.trim();
     const body = form.elements.body.value.trim();
     if (!title || !body) { toast('Both a title and a message are required.', 'error'); return; }
-    await saveAnnouncement({ title, body, level: form.level.value, active: true });
+    if (!(await saveAnnouncement({ title, body, level: form.elements.level.value, active: true }))) { toast('Announcement not published. Check access and connection.', 'error'); return; }
     form.reset();
     await loadAll(); renderAnnouncements();
     toast('Announcement published to every visitor.', 'success');
@@ -593,132 +585,3 @@ async function subscribePush() {
     toast('Push setup failed: ' + (err.message || err), 'error');
   }
 }
-
-/* ------------------------------------------------------ rules */
-export const FIRESTORE_RULES = `rules_version = '2';
-
-// Firebase console -> Firestore Database -> Rules -> paste this whole file -> Publish.
-//
-// Roles
-//   * READ the directory: anyone.
-//   * CREATE / edit own records: any signed-in visitor (anonymous session).
-//   * OWNER (full control, incl. deletes): the Email/Password console account(s)
-//     listed in isOwner() below. Keep that list in sync with config.js.
-//   * MODERATOR (limited): any other Email/Password console account. May approve
-//     requests, verify donors, read the inbox and publish notices — but can
-//     NEVER delete or edit existing records. Enforced server-side.
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isPasswordAccount() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'password';
-    }
-
-    // OWNER — project lead. Add further owner emails here if ever needed.
-    function isOwner() {
-      return isPasswordAccount()
-        && request.auth.token.email in ['foysal.cyber@gmail.com'];
-    }
-
-    // MODERATOR — any Email/Password account created in the console.
-    function isStaff() {
-      return isPasswordAccount();
-    }
-
-    // True when the update touches only the listed fields.
-    function changedOnly(fields) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
-    }
-
-    function validPhone(v) {
-      return v is string && v.matches('^(\\+880|0)1[3-9][0-9]{8}$');
-    }
-
-    function validGroup(v) {
-      return v in ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
-    }
-
-    match /donors/{donorId} {
-      allow read: if true;
-
-      allow create: if isSignedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 1
-        && request.resource.data.name.size() < 80
-        && validPhone(request.resource.data.phone)
-        && validGroup(request.resource.data.bloodGroup);
-
-      // Owner: anything. Donor: own record. Moderator: verify/unverify only.
-      allow update: if isOwner()
-        || (isSignedIn() && resource.data.uid == request.auth.uid)
-        || (isStaff() && changedOnly(['status', 'updatedAt'])
-            && request.resource.data.status in ['pending', 'verified']);
-
-      allow delete: if isOwner()
-        || (isSignedIn() && resource.data.uid == request.auth.uid);
-    }
-
-    match /requests/{requestId} {
-      allow read: if true;
-
-      allow create: if isSignedIn()
-        && validPhone(request.resource.data.phone)
-        && validGroup(request.resource.data.bloodGroup);
-
-      // Owner: anything. Poster: details + closing own request.
-      // Moderator: status changes only (approve / fulfil / cancel).
-      allow update: if isOwner()
-        || (isSignedIn() && resource.data.uid == request.auth.uid
-            && (request.resource.data.status == resource.data.status
-                || request.resource.data.status in ['fulfilled', 'cancelled']))
-        || (isStaff() && changedOnly(['status', 'updatedAt'])
-            && request.resource.data.status in ['active', 'fulfilled', 'cancelled']);
-
-      allow delete: if isOwner()
-        || (isSignedIn() && resource.data.uid == request.auth.uid);
-    }
-
-    // Visitor inbox: staff can read and mark read; only owner can delete.
-    match /messages/{messageId} {
-      allow read: if isStaff();
-      allow create: if request.resource.data.message is string
-                    && request.resource.data.message.size() < 1000;
-      allow update: if isStaff() && changedOnly(['read', 'updatedAt']);
-      allow delete: if isOwner();
-    }
-
-    match /announcements/{id} {
-      allow read: if true;
-      allow create, update: if isStaff();
-      allow delete: if isOwner();
-    }
-
-    // Daily counters, best effort.
-    match /analytics/{day} {
-      allow read: if true;
-      allow write: if true;
-    }
-
-    match /audit/{id} {
-      allow read, write: if isOwner();
-    }
-
-    match /settings/{id} {
-      allow read: if true;
-      allow write: if isOwner();
-    }
-
-    // Everything else: closed.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-`;

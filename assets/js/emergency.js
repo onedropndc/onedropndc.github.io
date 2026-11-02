@@ -1,7 +1,9 @@
+import { openRequestCard } from './cards.js';
+import { language } from './i18n.js';
 /* Emergency blood requests — posting, live feed, countdowns, sharing */
 
-import { BLOOD_GROUPS, countdown, formatDate, timeAgo, prettyPhone, isValidPhone, normalizePhone } from './blood.js';
-import { subscribeRequests, addRequest, updateRequest, deleteRequest, listDonors, isLive } from './data.js';
+import { BLOOD_GROUPS, countdown, formatDateTime, timeAgo, prettyPhone, isValidPhone, normalizePhone } from './blood.js';
+import { subscribeRequests, addRequest, updateRequest, deleteRequest, listDonors, isLive, nextEligibleDate } from './data.js';
 import { icon, toast, dialog, revealPhone, initReveal, bloodBadge, copyText, escapeHtml as _e } from './ui.js';
 import { DISTRICTS } from './geo.js';
 
@@ -14,24 +16,47 @@ export function renderRequestFeed(host, opts = {}) {
   host.dataset.compact = opts.compact ? '1' : '';
   host.innerHTML = `<div class="feed-loading">${icon('clock')}<span>Loading live requests…</span></div>`;
 
-  subscribeRequests((rows) => {
+  subscribeRequests((rows, mode) => {
+    host.dataset.mode = mode;
     liveRows = rows;
     paintFeed(host, opts);
+    applyRequestLink(host);
   });
 
   if (!countdownTimer) {
-    countdownTimer = setInterval(() => {
+    const updateTimes = () => {
       document.querySelectorAll('[data-countdown]').forEach((el) => {
-        const c = countdown(el.dataset.countdown);
-        if (!c) return;
-        el.textContent = c.overdue ? `${c.text} overdue` : `${c.text} left`;
+        const c = countdown(el.dataset.countdown); if (!c) return;
+        const value = countdownText(c); if (el.textContent !== value) el.textContent = value;
         el.classList.toggle('is-overdue', c.overdue);
       });
-    }, 1000);
+      document.querySelectorAll('[data-request-date]').forEach(el => {
+        const value = requestDate(el.dataset.requestDate); if (el.textContent !== value) el.textContent = value;
+      });
+    };
+    countdownTimer = setInterval(updateTimes, 1000);
+    let lastLang=language();
+    new MutationObserver(() => { const next=language(); if(next!==lastLang) {lastLang=next;updateTimes();} }).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
   }
+
+}
+
+function countdownText(c) {
+  if (language() !== 'bn') return `${c.text} ${c.overdue ? 'overdue' : 'left'}`;
+  const text=c.text.replace(/(\d+)d/g,'$1 দিন').replace(/(\d+)h/g,'$1 ঘণ্টা').replace(/(\d+)m/g,'$1 মিনিট').replace(/(\d+)s/g,'$1 সেকেন্ড');
+  return `${text} ${c.overdue ? 'অতিক্রান্ত' : 'বাকি'}`;
+}
+function requestDate(value) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return '—';
+  try {return new Intl.DateTimeFormat(language()==='bn'?'bn-BD':'en-GB',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:false,timeZone:'Asia/Dhaka'}).format(new Date(value));} catch {return formatDateTime(value);}
 }
 
 function paintFeed(host, opts) {
+  // Never infer that there are no emergencies when the server is unavailable.
+  if (host.dataset.mode !== 'live' && !liveRows.length) {
+    host.innerHTML = `<div class="all-clear">সরাসরি তথ্য পাওয়া যাচ্ছে না। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।</div>`;
+    return;
+  }
   // Public board: pending rows await moderation; expired rows auto-remove.
   const visible = liveRows.filter((r) => r.status !== 'pending' && !expired(r));
   const active = visible.filter((r) => r.status === 'active');
@@ -39,18 +64,24 @@ function paintFeed(host, opts) {
   const limit = opts.limit || active.length;
   const list = active.slice(0, limit);
 
+  if (!list.length && host.dataset.mode !== 'live') {
+    host.innerHTML = `<div class="all-clear">পুরোনো তথ্য দেখানো হচ্ছে। বর্তমানে জরুরি অনুরোধ আছে কি না নিশ্চিত করা যাচ্ছে না।</div>`;
+    if (done.length && !opts.compact) host.insertAdjacentHTML('beforeend', closedSection(done));
+    wireFeed(host);
+    return;
+  }
   if (!list.length && !opts.compact) {
     host.innerHTML = `<div class="empty empty-soft">
       <div class="empty-mark ok">${icon('check')}</div>
       <h3>No active emergency right now</h3>
-      <p>That is good news. If a hospital needs blood, post it here — donors across the network get alerted instantly.</p>
+      <p>No approved active requests are visible. If blood is needed, submit a request and share it with your community.</p>
     </div>`;
     if (done.length) host.insertAdjacentHTML('beforeend', closedSection(done));
     wireFeed(host);
     return;
   }
   if (!list.length && opts.compact) {
-    host.innerHTML = `<div class="all-clear">${icon('check')}<span>No active emergency requests right now — the network is calm.</span></div>`;
+    host.innerHTML = `<div class="all-clear">${icon('check')}<span>No approved active requests are currently shown.</span></div>`;
     return;
   }
 
@@ -58,8 +89,33 @@ function paintFeed(host, opts) {
     + (opts.compact && active.length > limit ? `<a class="see-all" href="emergency.html">See all ${active.length} active requests →</a>` : '')
     + (!opts.compact && done.length ? closedSection(done) : '');
 
+  if (host.dataset.mode !== 'live') host.insertAdjacentHTML('afterbegin', '<p class="callout">পুরোনো তথ্য দেখানো হচ্ছে; বর্তমান অবস্থা যাচাই করুন।</p>');
   wireFeed(host);
   initReveal(host);
+}
+
+// A shared link targets an approved request; pending or unavailable items are
+// never displayed merely because their ID was included in the URL.
+function applyRequestLink(host) {
+  if (host.id !== 'requestFeed') return;
+  const id = new URLSearchParams(location.search).get('req');
+  if (!id) return;
+  const card = Array.from(host.querySelectorAll('[data-req]')).find(el => el.dataset.req === id);
+  if (!card) {
+    const note = document.createElement('p');
+    note.className = 'callout request-link-status';
+    note.textContent = host.dataset.mode !== 'live'
+      ? 'The shared request cannot be confirmed while live data is unavailable.'
+      : 'This request is not currently visible. It may be awaiting review, expired or removed.';
+    host.prepend(note);
+    return;
+  }
+  const details = card.closest('details'); if (details) details.open = true;
+  card.classList.add('is-linked');
+  if (!host.dataset.linkScrolled) {
+    host.dataset.linkScrolled = '1';
+    requestAnimationFrame(() => card.scrollIntoView({ block: 'center', behavior: 'auto' }));
+  }
 }
 
 function closedSection(rows) {
@@ -74,31 +130,32 @@ function expired(r) {
 function requestCard(r, compact = false, closed = false) {
   const c = countdown(r.neededBy);
   const critical = r.urgency === 'critical';
-  return `<article class="req-card ${critical ? 'is-critical' : ''} ${closed || r.status !== 'active' ? 'is-closed' : ''}" data-req="${r.id}" data-reveal>
+  return `<article class="req-card ${critical ? 'is-critical' : ''} ${closed || r.status !== 'active' ? 'is-closed' : ''}" data-req="${_e(r.id)}" data-reveal>
     <div class="req-head">
       ${bloodBadge(r.bloodGroup, 'lg')}
       <div class="req-title">
-        <h3>${_e(r.patient || 'Patient')}</h3>
-        <p class="req-hospital">${icon('pin')}<span>${_e([r.hospital, r.area, r.district].filter(Boolean).join(' · '))}</span></p>
+        <h3${r.patient ? ' data-no-translate' : ''}>${_e(r.patient || 'Blood needed')}</h3>
+        <p class="req-hospital">${icon('pin')}<span><span data-no-translate>${_e([r.hospital, r.area].filter(Boolean).join(' · '))}</span>${r.district ? `${r.hospital || r.area ? ' · ' : ''}<span>${_e(r.district)}</span>` : ''}</span></p>
       </div>
       ${closed || r.status !== 'active'
-        ? `<span class="req-state state-${r.status}">${r.status === 'fulfilled' ? 'Fulfilled' : r.status === 'cancelled' ? 'Cancelled' : 'Expired'}</span>`
+        ? `<span class="req-state state-${_e(r.status)}">${r.status === 'fulfilled' ? 'Fulfilled' : r.status === 'cancelled' ? 'Cancelled' : 'Expired'}</span>`
         : `<span class="req-live"><span class="pulse"></span>${critical ? 'Critical' : 'Urgent'}</span>`}
     </div>
 
     <ul class="req-facts">
-      <li><span>Units needed</span><strong>${r.units || 1}</strong></li>
-      <li><span>Needed by</span><strong>${r.neededBy ? formatDate(r.neededBy) : 'ASAP'}</strong></li>
-      <li><span>Posted</span><strong>${timeAgo(r.createdAt)}</strong></li>
-      ${c && !closed && r.status === 'active' ? `<li><span>Time</span><strong class="req-count" data-countdown="${r.neededBy}">${c.overdue ? c.text + ' overdue' : c.text + ' left'}</strong></li>` : ''}
+      <li><span>Units needed</span><strong>${_e(r.units || 1)}</strong></li>
+      <li><span>Needed by (BD time)</span><strong data-request-date="${_e(r.neededBy || '')}">${requestDate(r.neededBy)}</strong></li>
+      <li><span>Posted</span><strong>${timeAgo(r.createdAt) || '—'}</strong></li>
+      ${c && !closed && r.status === 'active' ? `<li><span>Time</span><strong class="req-count" data-countdown="${_e(r.neededBy)}">${countdownText(c)}</strong></li>` : ''}
     </ul>
 
     ${r.note ? `<p class="req-note">${_e(r.note)}</p>` : ''}
-    ${!compact ? `<p class="req-by muted small">Posted by ${_e(r.contactName || 'a volunteer')} · ${_e(r.district || '')}</p>` : ''}
+    ${!compact ? `<p class="req-by muted small"><span>Posted by</span> <span${r.contactName ? ' data-no-translate' : ''}>${_e(r.contactName || 'a volunteer')}</span> · <span>${_e(r.district || '')}</span></p>` : ''}
 
     <div class="req-actions">
       ${closed || r.status !== 'active' ? '' : `<button class="btn btn-primary btn-sm" data-act="contact">${icon('phone')}<span>Offer to donate</span></button>`}
       <button class="btn btn-ghost btn-sm" data-act="share">${icon('share')}<span>Share</span></button>
+      <button class="btn btn-ghost btn-sm" data-act="card">${icon('download')}<span>Create card</span></button>
       ${closed || r.status !== 'active' ? '' : `<button class="btn btn-ghost btn-sm" data-act="matches">${icon('search')}<span>Matching donors</span></button>`}
       ${closed || r.status !== 'active' ? '' : `<button class="btn btn-ghost btn-sm" data-act="done" title="Mark as fulfilled">${icon('check')}</button>`}
     </div>
@@ -111,31 +168,32 @@ function wireFeed(host) {
     if (!r) return;
     el.querySelector('[data-act="contact"]')?.addEventListener('click', () => offerToDonate(r));
     el.querySelector('[data-act="share"]')?.addEventListener('click', () => shareRequest(r));
+    el.querySelector('[data-act="card"]')?.addEventListener('click', () => openRequestCard(r));
     el.querySelector('[data-act="matches"]')?.addEventListener('click', () => findMatches(r));
     el.querySelector('[data-act="done"]')?.addEventListener('click', async () => {
-      const ok = await dialog({ title: 'Mark as fulfilled?', body: `<p>The request for <strong>${_e(r.patient)}</strong> will move to the closed list. Do this only when the blood has been arranged.</p>`, confirmText: 'Yes, fulfilled' });
-      if (ok) { await updateRequest(r.id, { status: 'fulfilled' }); toast('Marked as fulfilled. Thank you.', 'success'); }
+      const ok = await dialog({ title: 'Mark as fulfilled?', body: `<p>The request for <strong>${_e(r.patient || 'the patient')}</strong> will move to the closed list. Do this only when the blood has been arranged.</p>`, confirmText: 'Yes, fulfilled' });
+      if (ok) { const saved = await updateRequest(r.id, { status: 'fulfilled' }); toast(saved ? 'Marked as fulfilled. Thank you.' : 'Could not update this request. Only the requester or a moderator can close it.', saved ? 'success' : 'error'); }
     });
   });
 }
 
 async function offerToDonate(r) {
   const donors = await listDonors();
-  const compat = donors.filter((d) => d.available !== false && d.status !== 'suspended' && d.bloodGroup === r.bloodGroup).slice(0, 5);
+  const compat = donors.filter((d) => r.district && d.district === r.district && d.available !== false && d.status !== 'suspended' && d.bloodGroup === r.bloodGroup && (!nextEligibleDate(d) || new Date(nextEligibleDate(d)) <= new Date())).slice(0, 5);
   dialog({
     title: 'Offer to donate',
     body: `<div class="offer">
-      <p><strong>${_e(r.patient)}</strong> needs <strong>${r.units || 1} unit(s)</strong> of <strong>${r.bloodGroup}</strong> at ${_e(r.hospital || 'the hospital')}.</p>
+      <p><strong>${_e(r.patient || 'A patient')}</strong> needs <strong>${_e(r.units || 1)} unit(s)</strong> of <strong>${_e(r.bloodGroup)}</strong> at ${_e(r.hospital || 'the hospital')}.</p>
       <p class="muted small">Call the attendant, confirm the requirement and the blood bank timing, then reach the hospital with your national ID.</p>
       <div class="offer-attendant">
         <div class="offer-attendant-who">
           <strong>${_e(r.contactName || 'Attendant')}</strong>
           <span class="muted small">is handling this request</span>
         </div>
-        <button class="btn btn-primary btn-sm" type="button" data-rev="${r.phone}">${icon('phone')}<span>Show attendant contact</span></button>
+        <button class="btn btn-primary btn-sm" type="button" data-rev="${_e(r.phone)}">${icon('phone')}<span>Show attendant contact</span></button>
       </div>
-      ${compat.length ? `<p class="offer-alt">Other ${_e(r.bloodGroup)} donors near this request:</p>
-        <ul class="offer-list">${compat.map((d) => `<li><span>${_e(d.name)} · ${_e(d.area || d.district || '')}</span><button class="link-btn" data-rev="${d.phone}">Show contact</button></li>`).join('')}</ul>` : ''}
+      ${compat.length ? `<p class="offer-alt">Other ${_e(r.bloodGroup)} donors marked available in the same district:</p>
+        <ul class="offer-list">${compat.map((d) => `<li><span>${_e(d.name)} · ${_e(d.area || d.district || '')}</span><button class="link-btn" data-rev="${_e(d.phone)}">Show contact</button></li>`).join('')}</ul>` : ''}
     </div>`,
     confirmText: 'Close', hideCancel: true
   });
@@ -148,7 +206,7 @@ export function shareRequest(r) {
   const url = new URL('emergency.html', location.href);
   url.searchParams.set('req', r.id);
   const abs = url.href;
-  const text = `🩸 URGENT BLOOD REQUEST\n${r.patient} needs ${r.units || 1} unit(s) of ${r.bloodGroup}\nHospital: ${r.hospital}${r.area ? ', ' + r.area : ''}${r.district ? ', ' + r.district : ''}\nNeeded by: ${r.neededBy ? formatDate(r.neededBy) : 'ASAP'}\nContact: ${prettyPhone(r.phone)}\n${r.note || ''}\n\nVia One Drop — A Drop of Life · NDC Batch 27 blood donor community`;
+  const text = `🩸 URGENT BLOOD REQUEST\n${r.patient || 'A patient'} needs ${r.units || 1} unit(s) of ${r.bloodGroup}\nHospital: ${r.hospital}${r.area ? ', ' + r.area : ''}${r.district ? ', ' + r.district : ''}\nNeeded by: ${r.neededBy ? formatDateTime(r.neededBy) : 'ASAP'}\nContact: ${prettyPhone(r.phone)}\n${r.note || ''}\n\nVia One Drop — A Drop of Life · NDC Batch 27 blood donor community`;
 
   const items = [
     { id: 'native', label: 'More options', ico: 'share' },
@@ -168,7 +226,7 @@ export function shareRequest(r) {
     sheet.querySelectorAll('[data-share]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const kind = btn.dataset.share;
-        if (kind === 'poster') { makePoster(r); return; }
+        if (kind === 'poster') { sheet.querySelector('[data-ok]')?.click(); openRequestCard(r); return; }
         if (kind === 'native' && navigator.share) { try { await navigator.share({ title: text.split('\n')[0], text, url: abs }); } catch { /* dismissed */ } return; }
         if (kind === 'whatsapp') { window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + abs)}`, '_blank', 'noopener'); return; }
         if (kind === 'facebook') { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(abs)}`, '_blank', 'noopener'); return; }
@@ -179,90 +237,10 @@ export function shareRequest(r) {
   }, 30);
 }
 
-/* ------------------------------------------------ share poster */
-function dropPath(x, cx, cy, r) {
-  x.beginPath();
-  x.moveTo(cx, cy - r * 1.35);
-  x.bezierCurveTo(cx + r * 0.95, cy - r * 0.25, cx + r, cy + r * 0.25, cx + r * 0.72, cy + r * 0.75);
-  x.bezierCurveTo(cx + r * 0.4, cy + r * 1.18, cx - r * 0.4, cy + r * 1.18, cx - r * 0.72, cy + r * 0.75);
-  x.bezierCurveTo(cx - r, cy + r * 0.25, cx - r * 0.95, cy - r * 0.25, cx, cy - r * 1.35);
-  x.closePath();
-}
-
-function wrapCenter(x, text, cx, y, maxW, lh, maxLines = 3) {
-  const words = String(text || '').split(/\s+/);
-  let line = '', lines = [];
-  for (const w of words) {
-    const t = line ? line + ' ' + w : w;
-    if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
-  }
-  if (line) lines.push(line);
-  lines = lines.slice(0, maxLines);
-  lines.forEach((l, i) => x.fillText(l, cx, y + i * lh));
-  return lines.length;
-}
-
-function makePoster(r) {
-  const W = 1080, H = 1350;
-  const c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const x = c.getContext('2d');
-  const SYS = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-  const bg = x.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#8c0d1f'); bg.addColorStop(.55, '#5c0815'); bg.addColorStop(1, '#38050d');
-  x.fillStyle = bg; x.fillRect(0, 0, W, H);
-
-  x.save(); x.globalAlpha = .06; x.fillStyle = '#ffffff';
-  for (let i = 0; i < 24; i++) { dropPath(x, (i * 197) % W, (i * 331) % H, 16 + (i % 5) * 9); x.fill(); }
-  x.restore();
-
-  x.textAlign = 'center';
-  x.fillStyle = '#ffd9de'; x.font = `700 34px ${SYS}`;
-  x.fillText('O N E   D R O P', W / 2, 96);
-  x.fillStyle = '#e8aab2'; x.font = `500 26px ${SYS}`;
-  x.fillText('A Drop of Life · Notre Dame College · Batch 27', W / 2, 138);
-
-  x.save(); x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = 40; x.shadowOffsetY = 16;
-  dropPath(x, W / 2, 420, 170); x.fillStyle = '#ffffff'; x.fill(); x.restore();
-  x.fillStyle = '#8C0D1F'; x.font = `800 130px ${SYS}`;
-  x.fillText(r.bloodGroup, W / 2, 470);
-
-  x.fillStyle = '#ff5d73'; x.font = `800 54px ${SYS}`;
-  x.fillText('URGENT BLOOD REQUEST', W / 2, 700);
-
-  x.fillStyle = '#ffffff'; x.font = `700 60px ${SYS}`;
-  wrapCenter(x, `${r.patient || 'Patient'} · ${r.units || 1} unit(s)`, W / 2, 780, W - 170, 76);
-
-  x.fillStyle = '#ffd9de'; x.font = `500 40px ${SYS}`;
-  wrapCenter(x, `${r.hospital || ''}${r.area ? ', ' + r.area : ''}${r.district ? ', ' + r.district : ''}`, W / 2, 900, W - 150, 54);
-
-  x.fillStyle = '#ffffff'; x.font = `700 44px ${SYS}`;
-  x.fillText(`Needed by: ${r.neededBy ? formatDate(r.neededBy) : 'ASAP'}`, W / 2, 1030);
-  x.fillStyle = '#ffd9de'; x.font = `600 46px ${SYS}`;
-  x.fillText(`Contact: ${prettyPhone(r.phone)} (${r.contactName || 'attendant'})`, W / 2, 1096);
-
-  x.strokeStyle = 'rgba(255,255,255,.25)'; x.lineWidth = 2;
-  x.beginPath(); x.moveTo(140, 1180); x.lineTo(W - 140, 1180); x.stroke();
-  x.fillStyle = '#e8aab2'; x.font = `500 30px ${SYS}`;
-  x.fillText('Verify through the hospital blood bank before travelling.', W / 2, 1230);
-  x.fillStyle = '#ffffff'; x.font = `700 34px ${SYS}`;
-  x.fillText('onedropndc.github.io', W / 2, 1284);
-
-  const a = document.createElement('a');
-  a.download = `onedrop-request-${r.bloodGroup}.png`;
-  a.href = c.toDataURL('image/png');
-  a.click();
-  toast('Poster saved — share it anywhere.', 'success');
-}
-
 async function findMatches(r) {
-  const donors = await listDonors();
-  const list = donors.filter((d) => d.status !== 'suspended' && d.bloodGroup === r.bloodGroup);
-  const avail = list.filter((d) => d.available !== false);
-  toast(`${avail.length} available · ${list.length} total ${r.bloodGroup} donors in the directory`, 'info', 5200);
-  const url = `donors.html?group=${encodeURIComponent(r.bloodGroup)}`;
-  setTimeout(() => { location.href = url; }, 700);
+  const filters = new URLSearchParams({ group: r.bloodGroup });
+  if (r.district) filters.set('district', r.district);
+  location.href = `donors.html?${filters.toString()}`;
 }
 
 /* ------------------------------------------------- post form */
@@ -273,15 +251,12 @@ export function initRequestForm() {
   form.querySelector('[name="bloodGroup"]').innerHTML =
     `<option value="">Select blood group</option>` + BLOOD_GROUPS.map((g) => `<option value="${g}">${g}</option>`).join('');
   form.querySelector('[name="district"]').innerHTML =
-    `<option value="">Select district</option>` + DISTRICTS.map((d) => `<option value="${d}" ${d === 'Dhaka' ? 'selected' : ''}>${d}</option>`).join('');
+    `<option value="">Select district</option>` + DISTRICTS.map((d) => `<option value="${d}">${d}</option>`).join('');
 
-  // Default "needed by" = 24h from now
+  // Require an explicit deadline; do not silently invent a 24-hour deadline.
   const by = form.querySelector('[name="neededBy"]');
-  if (by) {
-    const d = new Date(Date.now() + 24 * 36e5);
-    by.min = new Date(Date.now() - 6e4).toISOString().slice(0, 16);
-    by.value = new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
-  }
+  const localMinute = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  if (by) by.min = localMinute(new Date());
 
   form.querySelectorAll('[data-live-error]').forEach((f) => {
     f.addEventListener('blur', () => validateField(f));
@@ -295,7 +270,7 @@ export function initRequestForm() {
     let ok = true;
     form.querySelectorAll('[data-live-error]').forEach((f) => { if (!validateField(f)) ok = false; });
     if (!isValidPhone(data.phone)) { setError(form.elements.phone, 'Enter a valid Bangladeshi mobile number, e.g. 01712345678'); ok = false; }
-    if (!ok) { toast('Please fix the highlighted fields.', 'error'); form.querySelector('.is-invalid')?.focus(); return; }
+    if (!ok) { toast('Please fix the highlighted fields.', 'error'); form.querySelector('.is-invalid .input')?.focus(); return; }
 
     const btn = form.querySelector('[type="submit"]');
     btn.disabled = true; btn.classList.add('is-loading'); btn.textContent = 'Posting…';
@@ -306,18 +281,30 @@ export function initRequestForm() {
       neededBy: data.neededBy ? new Date(data.neededBy).toISOString() : null,
       urgency: data.urgency || 'urgent'
     };
-    const saved = await addRequest(payload);
-    btn.disabled = false; btn.classList.remove('is-loading'); btn.textContent = 'Post emergency request';
+    let saved;
+    try { saved = await addRequest(payload); } catch (err) {
+      btn.disabled = false; btn.classList.remove('is-loading'); btn.textContent = 'Submit request for review';
+      toast('অনুরোধটি জমা হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।', 'error', 10000);
+      return;
+    }
+    btn.disabled = false; btn.classList.remove('is-loading'); btn.textContent = 'Submit request for review';
     form.reset();
-    if (by) by.value = new Date(Date.now() + 24 * 36e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+    if (by) by.min = localMinute(new Date());
 
-    toast('Request submitted — a moderator reviews it and it goes live shortly.', 'success', 6000);
-    dialog({
-      title: 'Request sent for review',
-      body: `<p>A moderator will approve it within minutes; approved requests appear on the live board and trigger alerts.
-      Meanwhile, sharing this request multiplies your chances of finding a donor within the hour.</p>`,
-      confirmText: 'Share on WhatsApp', variant: 'primary'
-    }).then((yes) => { if (yes) shareRequest(saved); });
+    const next = document.getElementById('requestNext');
+    if (next) {
+      const filters = new URLSearchParams({ group: saved.bloodGroup, district: saved.district });
+      next.hidden = false;
+      next.innerHTML = `<span class="next-kicker">REQUEST RECEIVED</span><h3>Waiting for moderator review</h3>
+        <p>Your request has been submitted for review. The shared link will show it on the board only after approval; meanwhile, search for donors or share the details directly.</p>
+        <div class="next-actions"><a class="btn btn-primary btn-sm" href="donors.html?${filters.toString()}">Find matching donors →</a>
+        <button class="btn btn-ghost btn-sm" id="shareSubmitted" type="button">Share request</button>
+        <button class="btn btn-ghost btn-sm" id="cardSubmitted" type="button">Create request card</button></div>`;
+      next.querySelector('#shareSubmitted').addEventListener('click', () => shareRequest(saved));
+      next.querySelector('#cardSubmitted').addEventListener('click', () => openRequestCard(saved));
+      next.focus(); next.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    toast('Request submitted for review.', 'success', 6000);
   });
 }
 
@@ -326,6 +313,7 @@ function validateField(field) {
   const val = String(field.value || '').trim();
   let msg = '';
   if (rules.required && !val) msg = rules.requiredMsg || 'This field is required';
+  else if (rules.units && val && (!Number.isInteger(Number(val)) || Number(val) < 1 || Number(val) > 10)) msg = 'Enter a whole number from 1 to 10';
   else if (rules.phone && val && !isValidPhone(val)) msg = 'Enter a valid mobile number (11 digits, starts with 01)';
   else if (rules.min && val.length < rules.min) msg = `Please use at least ${rules.min} characters`;
   else if (rules.future && val && new Date(val).getTime() < Date.now()) msg = 'Choose a time in the future';
